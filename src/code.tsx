@@ -66,11 +66,56 @@ async function createTemplateCard(templateType: keyof typeof TEMPLATES) {
   frame.x = viewport.x;
   frame.y = viewport.y;
   frame.resize(400, 300);
-  frame.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
+  // Transparent background with slight tint for visibility
+  frame.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 }, opacity: 0.85 }];
   frame.strokes = [{ type: 'SOLID', color: { r: 0.8, g: 0.8, b: 0.8 } }];
   frame.cornerRadius = 8;
 
-  // Add title
+  // Add icon shape based on template type (right-justified)
+  const iconSize = 32;
+  const iconX = 400 - 20 - iconSize; // Right edge minus padding minus icon size
+  let iconShape: SceneNode;
+
+  if (templateType === 'milestone') {
+    // Diamond shape for milestone (using polygon with 4 points)
+    const diamond = figma.createPolygon();
+    diamond.resize(iconSize, iconSize);
+    diamond.pointCount = 4;
+    diamond.fills = [{ type: 'SOLID', color: { r: 0.85, g: 0.2, b: 0.2 } }]; // Red
+    diamond.x = iconX;
+    diamond.y = 20;
+    iconShape = diamond;
+  } else if (templateType === 'userStory') {
+    // Circle for user story
+    const ellipse = figma.createEllipse();
+    ellipse.resize(iconSize, iconSize);
+    ellipse.fills = [{ type: 'SOLID', color: { r: 0.2, g: 0.5, b: 0.9 } }]; // Blue
+    ellipse.x = iconX;
+    ellipse.y = 20;
+    iconShape = ellipse;
+  } else if (templateType === 'epic') {
+    // Triangle for epic (using polygon)
+    const polygon = figma.createPolygon();
+    polygon.resize(iconSize, iconSize);
+    polygon.pointCount = 3;
+    polygon.fills = [{ type: 'SOLID', color: { r: 0.9, g: 0.6, b: 0.1 } }]; // Orange
+    polygon.x = iconX;
+    polygon.y = 20;
+    iconShape = polygon;
+  } else {
+    // Square for feature
+    const rect = figma.createRectangle();
+    rect.resize(iconSize, iconSize);
+    rect.fills = [{ type: 'SOLID', color: { r: 0.3, g: 0.7, b: 0.3 } }]; // Green
+    rect.cornerRadius = 4;
+    rect.x = iconX;
+    rect.y = 20;
+    iconShape = rect;
+  }
+
+  frame.appendChild(iconShape);
+
+  // Add title text (left side)
   const titleText = figma.createText();
   titleText.characters = template.title;
   titleText.fontSize = 24;
