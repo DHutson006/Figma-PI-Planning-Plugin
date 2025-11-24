@@ -1,0 +1,15 @@
+{
+    "name": "PI Planning Templates",
+    "id": "pi-planning-templates",
+    "api": "1.0.0",
+    "main": "code.js",
+    "ui": "ui.html",
+    "editorType": [
+        "figjam"
+    ],
+    "networkAccess": {
+        "allowedDomains": [
+            "none"
+        ]
+    }
+}

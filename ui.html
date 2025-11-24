@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>PI Planning Templates</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 16px;
+            background: var(--figma-color-bg);
+            color: var(--figma-color-text);
+        }
+
+        .header {
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .header p {
+            font-size: 12px;
+            color: var(--figma-color-text-secondary);
+        }
+
+        .template-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .template-card {
+            background: var(--figma-color-bg-secondary);
+            border: 1px solid var(--figma-color-border);
+            border-radius: 8px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .template-card:hover {
+            background: var(--figma-color-bg-hover);
+            border-color: var(--figma-color-border-selected);
+            transform: translateY(-1px);
+        }
+
+        .template-card:active {
+            transform: translateY(0);
+        }
+
+        .template-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--figma-color-text);
+        }
+
+        .template-description {
+            font-size: 12px;
+            color: var(--figma-color-text-secondary);
+            line-height: 1.4;
+        }
+
+        .template-fields {
+            margin-top: 8px;
+            font-size: 11px;
+            color: var(--figma-color-text-tertiary);
+        }
+
+        .icon {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>PI Planning Templates</h1>
+        <p>Select a template to insert into your board</p>
+    </div>
+
+    <div class="template-list">
+        <div class="template-card" data-template="milestone">
+            <div class="template-title">🎯 Milestone</div>
+            <div class="template-description">
+                Track key project milestones with dates and status
+            </div>
+            <div class="template-fields">Fields: Name, Target Date, Status, Description</div>
+        </div>
+
+        <div class="template-card" data-template="userStory">
+            <div class="template-title">📋 User Story</div>
+            <div class="template-description">
+                Standard user story format with acceptance criteria
+            </div>
+            <div class="template-fields">Fields: As a, I want, So that, Acceptance Criteria, Story Points, Priority
+            </div>
+        </div>
+
+        <div class="template-card" data-template="epic">
+            <div class="template-title">🚀 Epic</div>
+            <div class="template-description">
+                Large work items that span multiple sprints
+            </div>
+            <div class="template-fields">Fields: Name, Description, Business Value, Status</div>
+        </div>
+
+        <div class="template-card" data-template="feature">
+            <div class="template-title">⚡ Feature</div>
+            <div class="template-description">
+                Feature definition with team assignments
+            </div>
+            <div class="template-fields">Fields: Name, Description, Dependencies, Team</div>
+        </div>
+    </div>
+
+    <script>
+        // Handle template card clicks
+        document.querySelectorAll('.template-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const templateType = card.getAttribute('data-template');
+                parent.postMessage({
+                    pluginMessage: {
+                        type: 'insert-template',
+                        templateType: templateType
+                    }
+                }, '*');
+            });
+        });
+    </script>
+</body>
+
+</html>

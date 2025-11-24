@@ -1,0 +1,24 @@
+{
+    "name": "pi-planning-templates",
+    "version": "1.0.0",
+    "description": "Figma Jam widget for PI planning with ticket type templates",
+    "main": "code.js",
+    "scripts": {
+        "build": "tsc",
+        "watch": "tsc --watch"
+    },
+    "keywords": [
+        "figma",
+        "figjam",
+        "widget",
+        "pi-planning"
+    ],
+    "author": "",
+    "license": "MIT",
+    "devDependencies": {
+        "@figma/plugin-typings": "^1.121.0",
+        "@figma/widget-typings": "^1.0.0",
+        "@types/node": "^20.0.0",
+        "typescript": "^5.0.0"
+    }
+}
