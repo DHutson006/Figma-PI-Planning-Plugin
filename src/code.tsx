@@ -7,10 +7,13 @@ const TEMPLATES = {
     title: 'Theme',
     fields: [
       { label: 'Name', value: 'Theme Name' },
-      { label: 'Description', value: 'Business objective description...' },
+      { label: 'Description', value: 'Business objective description...\n' },
       { label: 'Business Value', value: 'High' },
-      { label: 'Status', value: 'Planning' },
       { label: 'Priority Rank', value: '#' },
+      {
+        label: 'Acceptance Criteria',
+        value: '- Criterion 1\n- Criterion 2\n- Criterion 3',
+      },
     ],
   },
   milestone: {
@@ -18,8 +21,7 @@ const TEMPLATES = {
     fields: [
       { label: 'Name', value: 'Milestone Name' },
       { label: 'Target Date', value: 'MM/DD/YYYY' },
-      { label: 'Status', value: 'Not Started' },
-      { label: 'Description', value: 'Milestone description...' },
+      { label: 'Description', value: 'Milestone description...\n' },
     ],
   },
   userStory: {
@@ -33,7 +35,6 @@ const TEMPLATES = {
         value: '- Criterion 1\n- Criterion 2\n- Criterion 3',
       },
       { label: 'Story Points', value: '?' },
-      { label: 'Priority', value: 'Medium' },
       { label: 'Assignee', value: 'Unassigned' },
     ],
   },
@@ -41,47 +42,62 @@ const TEMPLATES = {
     title: 'Epic',
     fields: [
       { label: 'Name', value: 'Epic Name' },
-      { label: 'Description', value: 'Epic description...' },
+      { label: 'Description', value: 'Epic description...\n' },
       { label: 'Business Value', value: 'High' },
-      { label: 'Status', value: 'Planning' },
+      { label: 'Team', value: 'Team Name' },
+      {
+        label: 'Acceptance Criteria',
+        value: '- Criterion 1\n- Criterion 2\n- Criterion 3',
+      },
     ],
   },
   initiative: {
     title: 'Initiative',
     fields: [
       { label: 'Name', value: 'Initiative Name' },
-      { label: 'Description', value: 'Initiative description...' },
+      { label: 'Description', value: 'Initiative description...\n' },
       { label: 'Dependencies', value: 'None' },
-      { label: 'Team', value: 'Team Name' },
+      { label: 'Priority Rank', value: '#' },
+      {
+        label: 'Acceptance Criteria',
+        value: '- Criterion 1\n- Criterion 2\n- Criterion 3',
+      },
     ],
   },
   task: {
     title: 'Task',
     fields: [
-      { label: 'Name', value: 'Task Name' },
-      { label: 'Description', value: 'Task description...' },
-      { label: 'Status', value: 'Not Started' },
+      { label: 'Description', value: 'Task description...\n' },
       { label: 'Assignee', value: 'Unassigned' },
+      {
+        label: 'Acceptance Criteria',
+        value: '- Criterion 1\n- Criterion 2\n- Criterion 3',
+      },
     ],
   },
   spike: {
     title: 'Spike',
     fields: [
-      { label: 'Name', value: 'Spike Name' },
-      { label: 'Description', value: 'Spike description...' },
-      { label: 'Status', value: 'In Progress' },
-      { label: 'Findings', value: 'Research findings...' },
+      { label: 'Description', value: 'Spike description...\n' },
       { label: 'Assignee', value: 'Unassigned' },
+      {
+        label: 'Acceptance Criteria',
+        value: '- Criterion 1\n- Criterion 2\n- Criterion 3',
+      },
     ],
   },
   test: {
     title: 'Test',
     fields: [
-      { label: 'Name', value: 'Test Name' },
-      { label: 'Description', value: 'Test description...' },
-      { label: 'Status', value: 'Not Started' },
+      { label: 'Given', value: '[initial context]' },
+      { label: 'When', value: '[event occurs]' },
+      { label: 'Then', value: '[expected outcome]' },
       { label: 'Test Type', value: 'Manual' },
       { label: 'Assignee', value: 'Unassigned' },
+      {
+        label: 'Acceptance Criteria',
+        value: '- Criterion 1\n- Criterion 2\n- Criterion 3',
+      },
     ],
   },
 };
@@ -551,9 +567,13 @@ function mapJiraIssueToTemplate(issue: { [key: string]: string }): {
   const issueType = issue['Issue Type'] || '';
   const summary = issue['Summary'] || '';
   const description = formatJiraText(issue['Description'] || '');
-  const status = issue['Status'] || '';
   const priority = issue['Priority'] || '';
-  const storyPoints = issue['Custom field (Story Points)'] || '';
+  // Parse and round story points to whole number
+  const storyPointsRaw = issue['Custom field (Story Points)'] || '';
+  const storyPoints =
+    storyPointsRaw && storyPointsRaw !== '?' && storyPointsRaw !== '#'
+      ? Math.round(parseFloat(storyPointsRaw) || 0).toString()
+      : storyPointsRaw || '?';
   const acceptanceCriteria = formatJiraText(
     issue['Custom field (Acceptance Criteria)'] || ''
   );
@@ -593,7 +613,10 @@ function mapJiraIssueToTemplate(issue: { [key: string]: string }): {
         Name: summary, // Name → Summary
         Description: description || 'Epic description...', // Description → Description
         'Business Value': businessValue || 'High',
-        Status: status || 'Planning',
+        Team: team || 'Team Name', // Team → Custom field (Studio)
+        'Acceptance Criteria':
+          acceptanceCriteria || '- Criterion 1\n- Criterion 2\n- Criterion 3',
+        issueKey: issueKey, // Store issue key for hyperlink
       },
     };
   } else if (
@@ -613,6 +636,7 @@ function mapJiraIssueToTemplate(issue: { [key: string]: string }): {
         'Story Points': storyPoints || '?',
         Priority: priority || 'Medium',
         Assignee: issue['Assignee'] || 'Unassigned',
+        issueKey: issueKey, // Store issue key for hyperlink
       },
     };
   } else if (dueDate || fixVersions) {
@@ -624,8 +648,8 @@ function mapJiraIssueToTemplate(issue: { [key: string]: string }): {
         title: summary, // Title → Summary
         Name: summary, // Name → Summary
         'Target Date': dueDate || fixVersions || 'MM/DD/YYYY',
-        Status: status || 'Not Started',
         Description: description || 'Milestone description...', // Description → Description
+        issueKey: issueKey, // Store issue key for hyperlink
       },
     };
   } else if (issueType.toLowerCase() === 'task') {
@@ -634,11 +658,12 @@ function mapJiraIssueToTemplate(issue: { [key: string]: string }): {
       templateType,
       data: {
         title: summary, // Title → Summary
-        Name: summary, // Name → Summary
         Description: description || 'Task description...', // Description → Description
-        Status: status || 'Not Started',
         'Story Points': storyPoints || '?', // Include Story Points if available
         Assignee: issue['Assignee'] || 'Unassigned',
+        'Acceptance Criteria':
+          acceptanceCriteria || '- Criterion 1\n- Criterion 2\n- Criterion 3',
+        issueKey: issueKey, // Store issue key for hyperlink
       },
     };
   } else if (issueType.toLowerCase() === 'spike') {
@@ -647,12 +672,12 @@ function mapJiraIssueToTemplate(issue: { [key: string]: string }): {
       templateType,
       data: {
         title: summary, // Title → Summary
-        Name: summary, // Name → Summary
         Description: description || 'Spike description...', // Description → Description
-        Status: status || 'In Progress',
-        Findings: formatJiraText(description || 'Research findings...'), // Use description as findings
         'Story Points': storyPoints || '?', // Include Story Points if available
         Assignee: issue['Assignee'] || 'Unassigned',
+        'Acceptance Criteria':
+          acceptanceCriteria || '- Criterion 1\n- Criterion 2\n- Criterion 3',
+        issueKey: issueKey, // Store issue key for hyperlink
       },
     };
   } else if (issueType.toLowerCase() === 'test') {
@@ -661,12 +686,13 @@ function mapJiraIssueToTemplate(issue: { [key: string]: string }): {
       templateType,
       data: {
         title: summary, // Title → Summary
-        Name: summary, // Name → Summary
         Description: description || 'Test description...', // Description → Description
-        Status: status || 'Not Started',
         'Test Type': issue['Custom field (Test Type)'] || 'Manual',
         'Story Points': storyPoints || '?', // Include Story Points if available
         Assignee: issue['Assignee'] || 'Unassigned',
+        'Acceptance Criteria':
+          acceptanceCriteria || '- Criterion 1\n- Criterion 2\n- Criterion 3',
+        issueKey: issueKey, // Store issue key for hyperlink
       },
     };
   } else if (issueType.toLowerCase() === 'theme') {
@@ -678,9 +704,10 @@ function mapJiraIssueToTemplate(issue: { [key: string]: string }): {
         Name: summary, // Name → Summary
         Description: description || 'Business objective description...', // Description → Description
         'Business Value': businessValue || 'High',
-        Status: status || 'Planning',
         'Priority Rank':
           issue['Priority'] || issue['Custom field (Priority Rank)'] || '#',
+        'Acceptance Criteria':
+          acceptanceCriteria || '- Criterion 1\n- Criterion 2\n- Criterion 3',
       },
     };
   } else {
@@ -693,7 +720,10 @@ function mapJiraIssueToTemplate(issue: { [key: string]: string }): {
         Name: summary, // Name → Summary
         Description: description || 'Initiative description...', // Description → Description
         Dependencies: dependencies || 'None',
-        Team: team || 'Team Name', // Team → Custom field (Studio)
+        'Priority Rank':
+          issue['Priority'] || issue['Custom field (Priority Rank)'] || '#',
+        'Acceptance Criteria':
+          acceptanceCriteria || '- Criterion 1\n- Criterion 2\n- Criterion 3',
       },
     };
   }
@@ -723,6 +753,11 @@ async function createTemplateCardWithPosition(
   frame.name = (customData && customData.title) || template.title;
   frame.x = cardX;
   frame.y = cardY;
+
+  // Store issue key in frame metadata if available (for export)
+  if (customData && customData.issueKey) {
+    frame.setPluginData('issueKey', customData.issueKey);
+  }
   // Larger cards to accommodate prominent number display
   const cardWidth = 500;
   frame.resize(cardWidth, 400);
@@ -790,28 +825,58 @@ async function createTemplateCardWithPosition(
   titleText.y = 20;
   // Set width to allow wrapping, then calculate actual height
   titleText.resize(cardWidth - 40, titleText.height); // cardWidth - left padding - right padding
+
+  // Add hyperlink to title if issue key is available
+  const issueKey = customData && customData.issueKey;
+  if (issueKey && issueKey.trim() !== '') {
+    try {
+      // Set hyperlink for the entire title text
+      const url = `https://myjira.com/browse/${issueKey.trim()}`;
+      titleText.setRangeHyperlink(0, titleText.characters.length, {
+        type: 'URL',
+        value: url,
+      });
+    } catch (e) {
+      console.warn('Could not set hyperlink on title:', e);
+    }
+  }
+
   frame.appendChild(titleText);
 
   // Calculate title height after wrapping
   const titleHeight = titleText.height;
 
   // Add fields
-  // For user stories, always use Description format (consistent between import and menu creation)
-  // Replace As a/I want/So that with Description field
+  // For user stories: use Description when importing, but use As a/I want/So that for new cards
+  // For test tickets: use Description when importing, but use Given/When/Then for new cards
   let fieldsToShow = template.fields;
   if (templateType === 'userStory') {
-    // Always use Description format for user stories
-    const descriptionValue =
-      customData && customData['Description']
-        ? customData['Description']
-        : 'User story description...';
-
-    fieldsToShow = [{ label: 'Description', value: descriptionValue }].concat(
-      template.fields.filter(
-        (f) =>
-          f.label !== 'As a' && f.label !== 'I want' && f.label !== 'So that'
-      )
-    );
+    // Only use Description format if this is an imported card (has Description in customData)
+    // For new cards created via template button, use As a/I want/So that fields
+    if (customData && customData['Description']) {
+      // This is an imported card - use Description field
+      const descriptionValue = customData['Description'];
+      fieldsToShow = [{ label: 'Description', value: descriptionValue }].concat(
+        template.fields.filter(
+          (f) =>
+            f.label !== 'As a' && f.label !== 'I want' && f.label !== 'So that'
+        )
+      );
+    }
+    // Otherwise, use template fields as-is (which includes As a/I want/So that)
+  } else if (templateType === 'test') {
+    // Only use Description format if this is an imported card (has Description in customData)
+    // For new cards created via template button, use Given/When/Then fields
+    if (customData && customData['Description']) {
+      // This is an imported card - use Description field
+      const descriptionValue = customData['Description'];
+      fieldsToShow = [{ label: 'Description', value: descriptionValue }].concat(
+        template.fields.filter(
+          (f) => f.label !== 'Given' && f.label !== 'When' && f.label !== 'Then'
+        )
+      );
+    }
+    // Otherwise, use template fields as-is (which includes Given/When/Then)
   }
 
   // Filter out fields that will be displayed as large numbers or at the bottom (Assignee)
@@ -1035,6 +1100,49 @@ async function importCardsFromCSV(csvText: string) {
     return 'Backlog'; // Default for issues without sprint
   }
 
+  // Helper function to extract Sprint dates from issue
+  // Looks for date fields related to sprints (e.g., "Sprint Start Date", "Sprint End Date")
+  function getSprintDates(issue: { [key: string]: string }): string {
+    // Check for common sprint date field names
+    const dateKeys = Object.keys(issue).filter((key) => {
+      const lowerKey = key.toLowerCase();
+      return (
+        lowerKey.includes('sprint') &&
+        (lowerKey.includes('date') ||
+          lowerKey.includes('start') ||
+          lowerKey.includes('end'))
+      );
+    });
+
+    // Try to find start and end dates
+    let startDate = '';
+    let endDate = '';
+
+    for (const key of dateKeys) {
+      const value = issue[key];
+      if (value && value.trim() !== '') {
+        const lowerKey = key.toLowerCase();
+        if (lowerKey.includes('start')) {
+          startDate = value.trim();
+        } else if (lowerKey.includes('end')) {
+          endDate = value.trim();
+        }
+      }
+    }
+
+    // If we found both dates, format them
+    if (startDate && endDate) {
+      return `${startDate} - ${endDate}`;
+    } else if (startDate) {
+      return startDate;
+    } else if (endDate) {
+      return endDate;
+    }
+
+    // Return placeholder if no dates found
+    return 'MM/DD/YYYY - MM/DD/YYYY';
+  }
+
   // Group issues by Sprint
   const issuesBySprint: { [sprint: string]: typeof issues } = {};
   for (const issue of issues) {
@@ -1073,7 +1181,7 @@ async function importCardsFromCSV(csvText: string) {
       return 0;
     }
     const parsed = parseFloat(value);
-    return isNaN(parsed) ? 0 : parsed;
+    return isNaN(parsed) ? 0 : Math.round(parsed); // Round to whole number
   }
 
   // Helper function to calculate capacity per assignee for a sprint
@@ -1121,23 +1229,7 @@ async function importCardsFromCSV(csvText: string) {
     const dataFontSize = 16; // Increased from 12
     let currentY = y;
 
-    // Create header row
-    const headerAssignee = figma.createText();
-    headerAssignee.characters = 'Assignee';
-    headerAssignee.fontSize = headerFontSize;
-    try {
-      headerAssignee.fontName = { family: 'Inter', style: 'Bold' };
-    } catch (e) {
-      console.warn('Could not set Bold font for table header, using default');
-    }
-    headerAssignee.fills = [
-      { type: 'SOLID', color: { r: 0, g: 0, b: 0 } }, // Black for better readability
-    ];
-    headerAssignee.x = x;
-    headerAssignee.y = currentY;
-    figma.currentPage.appendChild(headerAssignee);
-    nodes.push(headerAssignee);
-
+    // Create header row - Allocated first, then Assignee
     const headerAllocated = figma.createText();
     headerAllocated.characters = 'Allocated';
     headerAllocated.fontSize = headerFontSize;
@@ -1149,41 +1241,61 @@ async function importCardsFromCSV(csvText: string) {
     headerAllocated.fills = [
       { type: 'SOLID', color: { r: 0, g: 0, b: 0 } }, // Black for better readability
     ];
-    // Position second column (estimate width of first column as 200px)
-    headerAllocated.x = x + 200 + columnSpacing;
+    headerAllocated.x = x; // First column
     headerAllocated.y = currentY;
     figma.currentPage.appendChild(headerAllocated);
     nodes.push(headerAllocated);
 
+    const headerAssignee = figma.createText();
+    headerAssignee.characters = 'Assignee';
+    headerAssignee.fontSize = headerFontSize;
+    try {
+      headerAssignee.fontName = { family: 'Inter', style: 'Bold' };
+    } catch (e) {
+      console.warn('Could not set Bold font for table header, using default');
+    }
+    headerAssignee.fills = [
+      { type: 'SOLID', color: { r: 0, g: 0, b: 0 } }, // Black for better readability
+    ];
+    // Position second column (estimate width of first column as 100px for numbers)
+    headerAssignee.x = x + 100 + columnSpacing;
+    headerAssignee.y = currentY;
+    figma.currentPage.appendChild(headerAssignee);
+    nodes.push(headerAssignee);
+
     currentY += rowHeight + 10; // Add spacing after header (increased)
 
-    // Sort assignees by name for consistent ordering
-    const sortedAssignees = Object.keys(capacity).sort();
+    // Sort assignees by allocation (highest to lowest)
+    const sortedAssignees = Object.keys(capacity).sort((a, b) => {
+      return capacity[b] - capacity[a]; // Descending order
+    });
 
     // Create data rows
     for (const assignee of sortedAssignees) {
       const points = capacity[assignee];
       if (points === 0) continue; // Skip assignees with 0 points
 
+      // Allocated column (first)
+      const pointsText = figma.createText();
+      pointsText.characters = points.toString();
+      pointsText.fontSize = dataFontSize;
+      pointsText.fills = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 } }]; // Black for better readability
+      pointsText.x = x; // First column
+      pointsText.y = currentY;
+      figma.currentPage.appendChild(pointsText);
+      nodes.push(pointsText);
+
+      // Assignee column (second)
       const assigneeText = figma.createText();
       assigneeText.characters = assignee;
       assigneeText.fontSize = dataFontSize;
       assigneeText.fills = [
         { type: 'SOLID', color: { r: 0, g: 0, b: 0 } }, // Black for better readability
       ];
-      assigneeText.x = x;
+      assigneeText.x = x + 100 + columnSpacing; // Second column
       assigneeText.y = currentY;
       figma.currentPage.appendChild(assigneeText);
       nodes.push(assigneeText);
-
-      const pointsText = figma.createText();
-      pointsText.characters = points.toString();
-      pointsText.fontSize = dataFontSize;
-      pointsText.fills = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 } }]; // Black for better readability
-      pointsText.x = x + 200 + columnSpacing;
-      pointsText.y = currentY;
-      figma.currentPage.appendChild(pointsText);
-      nodes.push(pointsText);
 
       currentY += rowHeight;
     }
@@ -1246,9 +1358,33 @@ async function importCardsFromCSV(csvText: string) {
     figma.currentPage.appendChild(sprintLabel);
     createdFrames.push(sprintLabel as any); // Add to frames for scrolling
 
-    // Add a line under the sprint title spanning all 3 columns
+    // Get sprint dates from the first issue in this sprint (if available)
+    const sprintDates =
+      sprintIssues.length > 0
+        ? getSprintDates(sprintIssues[0])
+        : 'MM/DD/YYYY - MM/DD/YYYY';
+
+    // Create sprint dates text - smaller font, positioned under the sprint label
+    const sprintDatesText = figma.createText();
+    sprintDatesText.characters = sprintDates;
+    sprintDatesText.fontSize = 14; // Same size as ticket text
+    sprintDatesText.fills = [
+      { type: 'SOLID', color: { r: 0.4, g: 0.4, b: 0.4 } },
+    ];
+
+    // Position dates centered under the sprint label
+    sprintDatesText.x =
+      viewport.x +
+      sprintXOffset +
+      (sprintLabelWidth - sprintDatesText.width) / 2; // Center the dates
+    sprintDatesText.y = sprintLabel.y + sprintLabel.height + 5; // Position below label with small spacing
+
+    figma.currentPage.appendChild(sprintDatesText);
+    createdFrames.push(sprintDatesText as any); // Add to frames for scrolling
+
+    // Add a line under the sprint dates spanning all 3 columns
     const line = figma.createLine();
-    const lineY = sprintLabel.y + sprintLabel.height + 10; // Position below the label with spacing
+    const lineY = sprintDatesText.y + sprintDatesText.height + 15; // Position below the dates with more spacing
     const lineStartX = viewport.x + sprintXOffset;
 
     line.x = lineStartX;
@@ -1263,6 +1399,10 @@ async function importCardsFromCSV(csvText: string) {
     // Track position within this sprint (3 columns)
     const columnHeights = [0, 0, 0]; // Track height of each column
     const columnWidth = cardWidth + spacing;
+
+    // Calculate starting Y position for cards (after the line with spacing)
+    const spacingAfterLine = 25; // Space between line and first card
+    const cardsStartY = lineY + spacingAfterLine;
 
     for (let i = 0; i < sprintIssues.length; i++) {
       const issue = sprintIssues[i];
@@ -1301,8 +1441,9 @@ async function importCardsFromCSV(csvText: string) {
         }
 
         // Calculate position within this sprint
+        // Cards start after the line with proper spacing
         const x = viewport.x + sprintXOffset + columnIndex * columnWidth;
-        const y = viewport.y + columnHeights[columnIndex];
+        const y = cardsStartY + columnHeights[columnIndex];
 
         // Create card with custom position
         const frame = await createTemplateCardWithPosition(
@@ -1343,7 +1484,9 @@ async function importCardsFromCSV(csvText: string) {
 // Function to extract data from a card frame
 function extractCardData(frame: FrameNode): {
   type: string;
+  title: string;
   fields: { label: string; value: string }[];
+  issueKey?: string;
 } | null {
   // Check if this is one of our template cards by checking the name
   // Use Set for O(1) lookup performance
@@ -1368,26 +1511,181 @@ function extractCardData(frame: FrameNode): {
   // Sort by Y position to get fields in order
   textNodes.sort((a, b) => a.y - b.y);
 
+  // Extract title from the first text node (which is the title)
+  // This ensures we get the updated title if the user edited it
+  const titleNode = textNodes[0];
+  const actualTitle = titleNode ? titleNode.characters.trim() : frame.name;
+
   // Skip the first text node (title) and process pairs (label, value)
+  // But skip large text nodes at the bottom (Assignee and Story Points) - they'll be extracted separately
   let i = 1; // Skip title
+  const bottomYThreshold = frame.height - 80; // Bottom area where large text nodes are
+
   while (i < textNodes.length) {
     const labelNode = textNodes[i];
     const valueNode = textNodes[i + 1];
 
     if (labelNode && valueNode) {
-      const label = labelNode.characters.replace(':', '').trim();
-      const value = valueNode.characters.trim();
-      fields.push({ label, value });
+      // Skip if these are bottom-positioned large text nodes (they'll be extracted separately)
+      const isBottomNode =
+        labelNode.y > bottomYThreshold || valueNode.y > bottomYThreshold;
+
+      if (!isBottomNode) {
+        const label = labelNode.characters.replace(':', '').trim();
+        const value = valueNode.characters.trim();
+        // Skip if label is empty or looks like a value (not a label)
+        if (label && !/^[\d?#]+$/.test(label)) {
+          fields.push({ label, value });
+        }
+      }
       i += 2; // Move to next pair
     } else {
       i++;
     }
   }
 
+  // Extract large number field (Story Points or Priority Rank) from bottom right FIRST
+  // Do this before extracting Assignee to avoid confusion
+  // These are displayed as large numbers (24px, bold) at the bottom of the card
+  const largeNumberField = getLargeNumberField(
+    cardType as keyof typeof TEMPLATES
+  );
+  if (largeNumberField) {
+    // Find the large number text node
+    // Large numbers are positioned at bottom right
+    // Strategy: Find the rightmost text node at the bottom that looks like a number
+
+    // Get all text nodes except title, sorted by Y (bottom to top), then by X (right to left)
+    const candidateNodes = textNodes
+      .filter((node) => node !== titleNode && node.characters.trim())
+      .sort((a, b) => {
+        // First sort by Y (bottom first)
+        const yDiff = b.y - a.y;
+        if (Math.abs(yDiff) > 10) return yDiff; // Different rows
+        // Same row, sort by X (right first)
+        return b.x - a.x;
+      });
+
+    // Look for the rightmost node at the bottom that matches number pattern
+    for (const node of candidateNodes) {
+      const text = node.characters.trim();
+      const nodeX = node.x;
+
+      // Check if text looks like a number (Story Points or Priority Rank)
+      // Can be digits, '?', or '#'
+      const looksLikeNumber = /^[\d?#]+$/.test(text);
+
+      // Check if it's on the right side (right 50% of card)
+      const isRightSide = nodeX > frame.width * 0.5;
+
+      if (looksLikeNumber && isRightSide) {
+        // This is likely the large number field
+        const existingField = fields.find((f) => f.label === largeNumberField);
+        if (!existingField) {
+          fields.push({ label: largeNumberField, value: text });
+        } else {
+          existingField.value = text;
+        }
+        break; // Found it
+      }
+    }
+  }
+
+  // Extract Assignee from bottom left (if applicable)
+  // Assignee is displayed as large text (24px, bold) at the bottom left
+  if (hasAssigneeField(cardType as keyof typeof TEMPLATES)) {
+    // Get all text nodes except title, sorted by Y (bottom to top), then by X (left to right)
+    const candidateNodes = textNodes
+      .filter((node) => node !== titleNode && node.characters.trim())
+      .sort((a, b) => {
+        // First sort by Y (bottom first)
+        const yDiff = b.y - a.y;
+        if (Math.abs(yDiff) > 10) return yDiff; // Different rows
+        // Same row, sort by X (left first)
+        return a.x - b.x;
+      });
+
+    // Look for the leftmost node at the bottom that doesn't match number pattern
+    for (const node of candidateNodes) {
+      const text = node.characters.trim();
+      const nodeX = node.x;
+
+      // Check if it's on the left side (left 50% of card)
+      const isLeftSide = nodeX < frame.width * 0.5;
+
+      // Check if this looks like an assignee (not a number, not empty)
+      const isNotNumber = !/^[\d?#]+$/.test(text);
+
+      if (isLeftSide && isNotNumber) {
+        // Check if we already have Assignee
+        const existingAssigneeField = fields.find(
+          (f) => f.label === 'Assignee'
+        );
+        if (!existingAssigneeField) {
+          fields.push({ label: 'Assignee', value: text });
+          break; // Found it
+        }
+      }
+    }
+  }
+
+  // Extract issue key from frame metadata if available
+  const issueKey = frame.getPluginData('issueKey') || '';
+
+  // Debug: Log extracted fields to help troubleshoot
+  console.log(
+    `Extracted fields for ${cardType}:`,
+    fields.map((f) => `${f.label}: ${f.value}`).join(', ')
+  );
+
   return {
     type: cardType,
+    title: actualTitle, // Include the actual title from text node
     fields,
+    issueKey: issueKey, // Include issue key if available
   };
+}
+
+/**
+ * Maps internal field names back to original CSV column names
+ */
+function mapFieldToCSVColumn(fieldLabel: string, templateType: string): string {
+  const mapping: { [key: string]: string } = {
+    // Common fields
+    Summary: 'Summary',
+    Name: 'Summary', // Name also maps to Summary
+    Description: 'Description',
+    Priority: 'Priority',
+    Assignee: 'Assignee',
+    'Story Points': 'Custom field (Story Points)',
+    'Acceptance Criteria': 'Custom field (Acceptance Criteria)',
+    'Business Value': 'Custom field (Business Value)',
+    'Target Date': 'Due Date',
+    Dependencies: 'Outward issue link (Blocks)',
+    Team: 'Custom field (Studio)',
+    'Priority Rank': 'Custom field (Priority Rank)',
+    'Test Type': 'Custom field (Test Type)',
+  };
+
+  return mapping[fieldLabel] || fieldLabel; // Return original if no mapping
+}
+
+/**
+ * Maps template type to Issue Type for CSV export
+ */
+function mapTemplateTypeToIssueType(templateType: string): string {
+  const mapping: { [key: string]: string } = {
+    Theme: 'Theme',
+    Initiative: 'Initiative',
+    Milestone: 'Milestone',
+    Epic: 'Epic',
+    'User Story': 'Story',
+    Task: 'Task',
+    Spike: 'Spike',
+    Test: 'Test',
+  };
+
+  return mapping[templateType] || templateType;
 }
 
 /**
@@ -1418,6 +1716,7 @@ function exportCardsToCSV() {
     type: string;
     title: string;
     fields: { label: string; value: string }[];
+    issueKey?: string;
   }> = [];
 
   // Find all frames on the current page that match our template names
@@ -1440,8 +1739,13 @@ function exportCardsToCSV() {
   for (const frame of frames) {
     const cardData = extractCardData(frame);
     if (cardData) {
-      // Get title from frame name (which is set to the card title)
-      const title = frame.name;
+      // Skip milestones - they won't be exported to Jira
+      if (cardData.type === 'Milestone') {
+        continue;
+      }
+
+      // Get title from extracted card data (which comes from the actual text node)
+      const title = cardData.title;
 
       // For user stories, concatenate As a/I want/So that into Description
       if (cardData.type === 'User Story') {
@@ -1451,15 +1755,50 @@ function exportCardsToCSV() {
 
         // If we have As a/I want/So that, concatenate them into Description
         if (asA && iWant && soThat) {
+          // Format: "As a [user type], I want [feature], so that [benefit]"
           const description = `As a ${asA.value}, I want ${iWant.value}, so that ${soThat.value}`;
-          // Remove As a/I want/So that and add Description
+
+          // Remove As a/I want/So that fields
           cardData.fields = cardData.fields.filter(
             (f) =>
               f.label !== 'As a' &&
               f.label !== 'I want' &&
               f.label !== 'So that'
           );
-          // Add Description at the beginning
+
+          // Remove any existing Description field (in case it was imported)
+          cardData.fields = cardData.fields.filter(
+            (f) => f.label !== 'Description'
+          );
+
+          // Add Description at the beginning with concatenated values
+          cardData.fields.unshift({ label: 'Description', value: description });
+        }
+      }
+
+      // For test tickets, concatenate Given/When/Then into Description
+      if (cardData.type === 'Test') {
+        const given = cardData.fields.find((f) => f.label === 'Given');
+        const when = cardData.fields.find((f) => f.label === 'When');
+        const then = cardData.fields.find((f) => f.label === 'Then');
+
+        // If we have Given/When/Then, concatenate them into Description
+        if (given && when && then) {
+          // Format: "Given [initial context], When [event occurs], Then [expected outcome]"
+          const description = `Given ${given.value}, When ${when.value}, Then ${then.value}`;
+
+          // Remove Given/When/Then fields
+          cardData.fields = cardData.fields.filter(
+            (f) =>
+              f.label !== 'Given' && f.label !== 'When' && f.label !== 'Then'
+          );
+
+          // Remove any existing Description field (in case it was imported)
+          cardData.fields = cardData.fields.filter(
+            (f) => f.label !== 'Description'
+          );
+
+          // Add Description at the beginning with concatenated values
           cardData.fields.unshift({ label: 'Description', value: description });
         }
       }
@@ -1468,6 +1807,7 @@ function exportCardsToCSV() {
         type: cardData.type,
         title: title,
         fields: cardData.fields,
+        issueKey: cardData.issueKey,
       });
     }
   }
@@ -1477,50 +1817,121 @@ function exportCardsToCSV() {
     return;
   }
 
-  // Get all unique field labels across all cards
-  const allFieldLabels = new Set<string>();
+  // Map all fields to CSV column names and collect unique CSV columns
+  // Maps CSV column name to array of internal field labels (for fields that map to same column)
+  const csvColumnMap = new Map<string, string[]>();
+  const allCSVColumns = new Set<string>();
+
   cards.forEach((card) => {
     card.fields.forEach((field) => {
-      allFieldLabels.add(field.label);
+      // Skip fields with invalid labels (like "?" or empty)
+      if (!field.label || field.label.trim() === '' || field.label === '?') {
+        return;
+      }
+
+      const csvColumn = mapFieldToCSVColumn(field.label, card.type);
+
+      // Skip if mapping returns invalid column name
+      if (!csvColumn || csvColumn.trim() === '' || csvColumn === '?') {
+        return;
+      }
+
+      // Handle fields that map to the same CSV column (e.g., Name and Summary both → Summary)
+      if (!csvColumnMap.has(csvColumn)) {
+        csvColumnMap.set(csvColumn, []);
+      }
+      const fieldLabels = csvColumnMap.get(csvColumn)!;
+      if (!fieldLabels.includes(field.label)) {
+        fieldLabels.push(field.label);
+      }
+
+      allCSVColumns.add(csvColumn);
     });
-  });
 
-  // Use canonical field order from templates, then add any additional fields
-  // that might exist in cards but not in templates (preserving template order)
-  const canonicalOrder = getCanonicalFieldOrder();
-  const orderedFields: string[] = [];
-  const unorderedFields: string[] = [];
-
-  // Add fields in canonical order
-  canonicalOrder.forEach((label) => {
-    if (allFieldLabels.has(label)) {
-      orderedFields.push(label);
+    // Add Issue key if available
+    if (card.issueKey) {
+      allCSVColumns.add('Issue key');
     }
   });
 
-  // Add any fields that exist in cards but not in templates
-  allFieldLabels.forEach((label) => {
-    if (!canonicalOrder.includes(label)) {
-      unorderedFields.push(label);
+  // Build ordered list of CSV columns
+  // Priority order: Summary, Issue key, Issue Type, then other fields
+  const orderedCSVColumns: string[] = [];
+  const remainingColumns: string[] = [];
+
+  // Always include these columns first
+  orderedCSVColumns.push('Summary'); // Always include Summary (title)
+  if (allCSVColumns.has('Issue key')) {
+    orderedCSVColumns.push('Issue key');
+  }
+  orderedCSVColumns.push('Issue Type'); // Always include Issue Type
+
+  // Add remaining columns in a logical order
+  const priorityOrder = [
+    'Description',
+    'Status',
+    'Priority',
+    'Assignee',
+    'Custom field (Story Points)',
+    'Custom field (Acceptance Criteria)',
+    'Custom field (Business Value)',
+    'Due Date',
+    'Outward issue link (Blocks)',
+    'Custom field (Studio)',
+    'Custom field (Priority Rank)',
+    'Custom field (Test Type)',
+  ];
+
+  priorityOrder.forEach((col) => {
+    if (allCSVColumns.has(col)) {
+      orderedCSVColumns.push(col);
     }
   });
 
-  // Combine: canonical order first, then any additional fields alphabetically
-  const fieldLabels = orderedFields.concat(unorderedFields.sort());
+  // Add any remaining columns alphabetically
+  allCSVColumns.forEach((col) => {
+    if (!orderedCSVColumns.includes(col) && col !== 'Issue Type') {
+      remainingColumns.push(col);
+    }
+  });
+  remainingColumns.sort();
+  const finalCSVColumns = orderedCSVColumns.concat(remainingColumns);
 
   // Generate CSV header
-  const header = ['Type', 'Title'].concat(fieldLabels).join(',');
+  const header = finalCSVColumns.join(',');
   const rows = [header];
 
   // Generate CSV rows
   cards.forEach((card) => {
-    const row: string[] = [card.type, card.title.replace(/"/g, '""')];
+    const row: string[] = [];
 
-    fieldLabels.forEach((label) => {
-      const field = card.fields.find((f) => f.label === label);
-      const value = field ? field.value.replace(/"/g, '""') : ''; // Escape quotes
-      row.push(`"${value}"`); // Wrap in quotes for CSV
+    finalCSVColumns.forEach((csvColumn) => {
+      let value = '';
+
+      if (csvColumn === 'Summary') {
+        value = card.title;
+      } else if (csvColumn === 'Issue key') {
+        value = card.issueKey || '';
+      } else if (csvColumn === 'Issue Type') {
+        value = mapTemplateTypeToIssueType(card.type);
+      } else {
+        // Find the internal field label(s) for this CSV column
+        const internalLabels = csvColumnMap.get(csvColumn);
+        if (internalLabels && internalLabels.length > 0) {
+          // If multiple fields map to same column (e.g., Name and Summary), prefer Summary
+          const preferredLabel = internalLabels.includes('Summary')
+            ? 'Summary'
+            : internalLabels[0];
+          const field = card.fields.find((f) => f.label === preferredLabel);
+          value = field ? field.value : '';
+        }
+      }
+
+      // Escape quotes and wrap in quotes for CSV
+      const escapedValue = value.replace(/"/g, '""');
+      row.push(`"${escapedValue}"`);
     });
+
     rows.push(row.join(','));
   });
 
@@ -1605,6 +2016,151 @@ figma.ui.onmessage = async (msg: {
     figma.closePlugin();
   }
 };
+
+// Function to handle card duplication detection
+// When a card with an issue key is duplicated, remove the issue key from the copy
+// so it's treated as a new card for export
+function handleCardDuplication() {
+  const templateNames = new Set([
+    'Theme',
+    'Initiative',
+    'Milestone',
+    'Epic',
+    'User Story',
+    'Task',
+    'Spike',
+    'Test',
+  ]);
+
+  // Find all template cards on the current page
+  const allFrames = figma.currentPage.findAll(
+    (node) => node.type === 'FRAME' && templateNames.has(node.name)
+  ) as FrameNode[];
+
+  // Track issue keys and their associated node IDs (ordered by creation/position)
+  const issueKeyToNodes = new Map<
+    string,
+    Array<{ id: string; created: number; frame: FrameNode; isCopy: boolean }>
+  >();
+
+  allFrames.forEach((frame) => {
+    const issueKey = frame.getPluginData('issueKey');
+    if (issueKey && issueKey.trim() !== '') {
+      if (!issueKeyToNodes.has(issueKey)) {
+        issueKeyToNodes.set(issueKey, []);
+      }
+      // Check if this card is already marked as a copy
+      const isCopy = frame.getPluginData('isCopy');
+      // Use a combination of x and y position as a proxy for creation order
+      // (earlier cards are typically positioned first)
+      // Also prioritize cards that are NOT marked as copies
+      const position = frame.x + frame.y * 10000;
+      const sortKey = isCopy === 'true' ? position + 1000000000 : position; // Push copies to end
+      issueKeyToNodes.get(issueKey)!.push({
+        id: frame.id,
+        created: sortKey,
+        frame: frame,
+        isCopy: isCopy === 'true',
+      });
+      console.log(
+        `Found card with issue key: ${issueKey}, isCopy: ${isCopy}, frame: ${frame.name}`
+      );
+    }
+  });
+
+  console.log(
+    `Total cards with issue keys: ${
+      Array.from(issueKeyToNodes.values()).flat().length
+    }`
+  );
+
+  // If an issue key appears in multiple cards, remove it from duplicates
+  // Keep the first one (not marked as copy, lowest position) as original
+  issueKeyToNodes.forEach((nodes, issueKey) => {
+    if (nodes.length > 1) {
+      console.log(`Found ${nodes.length} cards with issue key: ${issueKey}`);
+      // Sort: non-copies first, then by position
+      nodes.sort((a, b) => {
+        // If one is a copy and the other isn't, non-copy comes first
+        if (a.isCopy !== b.isCopy) {
+          return a.isCopy ? 1 : -1;
+        }
+        // Otherwise sort by position
+        return a.created - b.created;
+      });
+      const original = nodes[0];
+      const duplicates = nodes.slice(1);
+      console.log(
+        `Original: ${original.frame.name} (${original.id}), Duplicates: ${duplicates.length}`
+      );
+
+      duplicates.forEach((duplicate) => {
+        const duplicateFrame = duplicate.frame;
+        // Check if this duplicate hasn't been processed yet
+        const isCopy = duplicateFrame.getPluginData('isCopy');
+        const frameId = duplicateFrame.id;
+
+        if (isCopy !== 'true' && !processedCards.has(frameId)) {
+          // Remove issue key from duplicate so it's treated as a new card
+          duplicateFrame.setPluginData('issueKey', '');
+          // Mark as copy for tracking
+          duplicateFrame.setPluginData('isCopy', 'true');
+          // Track that we've processed this card
+          processedCards.add(frameId);
+
+          // Remove hyperlink from the title if it exists
+          const textNodes = duplicateFrame.findAll(
+            (node) => node.type === 'TEXT'
+          ) as TextNode[];
+          if (textNodes.length > 0) {
+            const titleNode = textNodes[0]; // First text node is the title
+            try {
+              // Clear hyperlink by setting empty URL
+              titleNode.setRangeHyperlink(0, titleNode.characters.length, {
+                type: 'URL',
+                value: '',
+              });
+            } catch (e) {
+              // Hyperlink might not exist or already cleared, ignore error
+            }
+          }
+
+          // Notify user that the card has been marked for export
+          const cardTitle =
+            textNodes.length > 0 ? textNodes[0].characters.trim() : 'Card';
+          figma.notify(
+            `📋 Copied card "${cardTitle}" marked for export (no issue key)`
+          );
+        }
+      });
+    }
+  });
+}
+
+// Track processed cards to avoid duplicate notifications
+const processedCards = new Set<string>();
+
+// Function to check for duplicates with better detection
+function checkForDuplicates() {
+  handleCardDuplication();
+}
+
+// Run duplicate check immediately on plugin load
+checkForDuplicates();
+
+// Listen for selection changes to detect when cards are duplicated
+figma.on('selectionchange', () => {
+  // Small delay to ensure duplication is complete before checking
+  setTimeout(() => {
+    checkForDuplicates();
+  }, 300);
+});
+
+// Also check periodically to catch any missed duplicates (especially from copy/paste)
+// This ensures we catch duplicates even if selection doesn't change
+setInterval(() => {
+  checkForDuplicates();
+}, 1500); // Check every 1.5 seconds for faster detection
 
 // Check if running in FigJam (recommended for this plugin)
 if (figma.editorType !== 'figjam') {
