@@ -271,17 +271,26 @@
         // Handle CSV file upload
         document.getElementById('csv-upload').addEventListener('change', (event) => {
             const file = event.target.files[0];
-            if (!file) return;
+            if (!file) {
+                console.error('No file selected');
+                return;
+            }
 
+            console.log('File selected:', file.name, 'Size:', file.size);
             const reader = new FileReader();
             reader.onload = (e) => {
                 const csvText = e.target.result;
+                console.log('File read successfully, length:', csvText.length);
                 parent.postMessage({
                     pluginMessage: {
                         type: 'import-csv',
                         csvText: csvText
                     }
                 }, '*');
+            };
+            reader.onerror = (error) => {
+                console.error('Error reading file:', error);
+                alert('Error reading file. Please try again.');
             };
             reader.readAsText(file);
         });
