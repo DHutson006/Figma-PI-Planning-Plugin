@@ -773,10 +773,13 @@ async function processIssueBatch(
   cardsStartY: number,
   epicKey: string,
   epicColumnHeights: { [epicKey: string]: number },
+  epicColumnCardCounts: { [epicKey: string]: number },
+  epicColumnOffsets: { [epicKey: string]: number },
   columnIndex: number,
   columnHeights: number[],
   createdFrames: FrameNode[],
   spacing: number,
+  columnWidth: number,
   jiraBaseUrl?: string,
   sprint?: string,
   epicLink?: string
@@ -784,6 +787,7 @@ async function processIssueBatch(
   let created = 0;
   let skipped = 0;
   const endIndex = Math.min(startIndex + batchSize, issues.length);
+  const MAX_CARDS_PER_COLUMN = 15;
 
   for (let i = startIndex; i < endIndex; i++) {
     const issue = issues[i];
@@ -794,11 +798,21 @@ async function processIssueBatch(
     }
 
     try {
+      // Check if we need to roll over to a new column (15 card limit)
+      if (epicColumnCardCounts[epicKey] >= MAX_CARDS_PER_COLUMN) {
+        // Reset height and card count for new column, increment column offset
+        epicColumnHeights[epicKey] = 0;
+        epicColumnCardCounts[epicKey] = 0;
+        epicColumnOffsets[epicKey] += 1;
+      }
+
+      // Calculate X position for current column (accounting for rollover)
+      const currentX = epicX + epicColumnOffsets[epicKey] * columnWidth;
       const y = cardsStartY + epicColumnHeights[epicKey];
       const frame = await createTemplateCardWithPosition(
         mapped.templateType,
         mapped.data,
-        epicX,
+        currentX,
         y,
         jiraBaseUrl
       );
@@ -870,7 +884,13 @@ async function processIssueBatch(
 
       createdFrames.push(frame);
       epicColumnHeights[epicKey] += frame.height + spacing;
-      columnHeights[columnIndex] += frame.height + spacing;
+      epicColumnCardCounts[epicKey] += 1; // Increment card count
+      // Update column height for the base column (epicIndex)
+      // This tracks the maximum height across all rollover columns for this epic
+      columnHeights[columnIndex] = Math.max(
+        columnHeights[columnIndex],
+        epicColumnHeights[epicKey]
+      );
       created++;
     } catch (error) {
       skipped++;
@@ -1052,8 +1072,10 @@ async function importCardsFromCSV(
       const capacity = calculateCapacity(sprintIssues);
 
       // Calculate sprint label width based on number of epic columns
+      // Note: This is a minimum width - actual width may be larger due to rollover columns
+      // We'll update this after processing all epics if needed
       const columnWidth = cardWidth + spacing;
-      const sprintLabelWidth = numColumns * columnWidth - spacing; // Total width of all epic columns
+      let sprintLabelWidth = numColumns * columnWidth - spacing; // Total width of all epic columns (minimum)
       const fixedSprintLabelY =
         viewport.y + LAYOUT_CONFIG.SPRINT_LABEL_Y_OFFSET; // Fixed Y position for sprint label
       const spacingBetweenTableAndLabel = LAYOUT_CONFIG.SPRINT_TABLE_SPACING;
@@ -1141,25 +1163,36 @@ async function importCardsFromCSV(
       figma.currentPage.appendChild(line);
       createdFrames.push(line as any); // Add to frames for scrolling
 
+      // Store line reference for later width updates
+      let sprintLine: LineNode = line;
+
       // Calculate starting Y position for cards (after the line with spacing)
       const spacingAfterLine = LAYOUT_CONFIG.SPRINT_AFTER_LINE_SPACING;
       const cardsStartY = lineY + spacingAfterLine;
 
       // Track position for each column (epic columns + any empty columns to reach minimum of 3)
       const epicColumnHeights: { [epicKey: string]: number } = {};
+      const epicColumnCardCounts: { [epicKey: string]: number } = {}; // Track card count per epic
+      const epicColumnOffsets: { [epicKey: string]: number } = {}; // Track column offset (for rollover)
       for (const epicKey of sortedEpics) {
         epicColumnHeights[epicKey] = 0;
+        epicColumnCardCounts[epicKey] = 0;
+        epicColumnOffsets[epicKey] = 0;
       }
       // Initialize heights for all columns (including empty ones if needed)
       const columnHeights: number[] = new Array(numColumns).fill(0);
+
+      // Track cumulative X offset for positioning epics (accounts for rollover columns)
+      let cumulativeXOffset = 0;
 
       // Process each epic column
       for (let epicIndex = 0; epicIndex < sortedEpics.length; epicIndex++) {
         const epicKey = sortedEpics[epicIndex];
         const epicColumnIssues = issuesByEpic[epicKey];
 
-        // Calculate X position for this epic column
-        const epicX = viewport.x + sprintXOffset + epicIndex * columnWidth;
+        // Calculate X position for this epic column (accounting for previous epics' rollover columns)
+        const baseEpicX = viewport.x + sprintXOffset + cumulativeXOffset;
+        let currentEpicX = baseEpicX;
 
         // Check if there's an epic issue that should be placed at the top of this column
         // Full epic card appears in the first sprint, simplified labels in all sprints with tickets
@@ -1204,7 +1237,7 @@ async function importCardsFromCSV(
                 const frame = await createTemplateCardWithPosition(
                   mapped.templateType,
                   mapped.data,
-                  epicX,
+                  currentEpicX,
                   y,
                   jiraBaseUrl
                 );
@@ -1243,6 +1276,7 @@ async function importCardsFromCSV(
 
                 createdFrames.push(frame);
                 epicColumnHeights[epicKey] += frame.height + spacing;
+                epicColumnCardCounts[epicKey] += 1; // Count epic card
                 columnHeights[epicIndex] += frame.height + spacing;
                 totalCreated++;
                 processedCount++;
@@ -1255,7 +1289,7 @@ async function importCardsFromCSV(
                 epicStatus,
                 epicPriorityRank,
                 epicIssueKey,
-                epicX,
+                currentEpicX,
                 y,
                 jiraBaseUrl
               );
@@ -1272,7 +1306,7 @@ async function importCardsFromCSV(
         }
 
         // Filter out the epic issue from the list of issues to process (if it was included)
-        const issuesToProcess = epicColumnIssues.filter(
+        let issuesToProcess = epicColumnIssues.filter(
           (issue: { [key: string]: string }) => {
             const issueType = (issue['Issue Type'] || '').trim().toLowerCase();
             const issueKey = issue['Issue key'] || '';
@@ -1287,6 +1321,33 @@ async function importCardsFromCSV(
             return true;
           }
         );
+
+        // Sort issues by story points (highest to lowest)
+        issuesToProcess.sort((a, b) => {
+          const getStoryPoints = (issue: {
+            [key: string]: string;
+          }): number | null => {
+            const storyPointsStr = issue['Custom field (Story Points)'] || '';
+            if (
+              !storyPointsStr ||
+              storyPointsStr.trim() === '' ||
+              storyPointsStr.trim() === '?'
+            ) {
+              return null; // No story points
+            }
+            return parseStoryPoints(storyPointsStr);
+          };
+
+          const pointsA = getStoryPoints(a);
+          const pointsB = getStoryPoints(b);
+
+          // Sort highest to lowest (descending order)
+          // Items without story points go to the end
+          if (pointsA === null && pointsB === null) return 0; // Both have no points, maintain order
+          if (pointsA === null) return 1; // A has no points, put it after B
+          if (pointsB === null) return -1; // B has no points, put it after A
+          return pointsB - pointsA; // Descending order (highest first)
+        });
 
         // Process issues in batches to prevent UI blocking
         for (
@@ -1325,14 +1386,17 @@ async function importCardsFromCSV(
             issuesToProcess,
             batchStart,
             BATCH_SIZE,
-            epicX,
+            currentEpicX,
             cardsStartY,
             epicKey,
             epicColumnHeights,
+            epicColumnCardCounts,
+            epicColumnOffsets,
             epicIndex,
             columnHeights,
             createdFrames,
             spacing,
+            columnWidth,
             jiraBaseUrl,
             sprint, // Pass sprint name
             firstIssueEpicLink || epicKey !== 'No Epic' ? epicKey : undefined // Pass epic link
@@ -1346,6 +1410,20 @@ async function importCardsFromCSV(
             await yieldToUI();
           }
         }
+
+        // Update cumulative X offset for next epic (base column + all rollover columns)
+        // Add 1 for base column, plus any rollover columns
+        const totalColumnsForThisEpic = 1 + epicColumnOffsets[epicKey];
+        cumulativeXOffset += totalColumnsForThisEpic * columnWidth;
+      }
+
+      // Update sprint label width to account for rollover columns
+      // The actual width needed is the cumulative offset (all columns including rollovers)
+      const actualSprintWidth = cumulativeXOffset;
+      if (actualSprintWidth > sprintLabelWidth) {
+        sprintLabelWidth = actualSprintWidth;
+        // Update the line width to match
+        sprintLine.resize(sprintLabelWidth, 0);
       }
 
       // Move to next sprint position

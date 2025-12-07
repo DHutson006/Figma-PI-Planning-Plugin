@@ -280,7 +280,9 @@ Future Enhancments:
 - Consider only bringing in epic name and having priority the same as theme in the bottom right. 
 - Label columns with Epic in a user story map view.
 
-
+Enhancment:
+support sprint timelines from multiple teams.
+Space out sprints a little bit
 
 ## License
 
