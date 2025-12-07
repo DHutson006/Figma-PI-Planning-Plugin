@@ -524,33 +524,51 @@ function mapJiraIssueToTemplate(issue: { [key: string]: string }): {
  * Extracts sprint value from a Jira issue, handling multiple sprint column variations.
  */
 function getSprintValue(issue: { [key: string]: string }): string {
-  // Check all possible Sprint column variations
-  // Since CSV parser may overwrite duplicate column names, check all keys
-  const sprintKeys = Object.keys(issue).filter((key) =>
-    key.toLowerCase().includes('sprint')
+  // First, prioritize exact "Sprint" column matches (case-insensitive)
+  // This handles the most common case where columns are named exactly "Sprint"
+  const exactSprintKeys = Object.keys(issue).filter(
+    (key) => key.toLowerCase() === 'sprint'
   );
 
-  // Try each Sprint column in order
-  for (const key of sprintKeys) {
+  // Try exact "Sprint" matches first
+  for (const key of exactSprintKeys) {
     const value = issue[key];
     if (value && value.trim() !== '') {
-      // Extract just the sprint name (e.g., "Triton 2025-25" from any format)
       const trimmed = value.trim();
-      // If it looks like a sprint name (contains numbers or common patterns), use it
-      if (trimmed.length > 0 && trimmed !== '[]') {
+      // Skip empty values, empty arrays, and non-sprint-looking values
+      if (
+        trimmed.length > 0 &&
+        trimmed !== '[]' &&
+        !trimmed.startsWith('Checklist(') // Exclude Smart Checklist values
+      ) {
         return trimmed;
       }
     }
   }
 
-  // Also check if the issue object has Sprint data in a different format
-  // Sometimes CSV parsers handle duplicate columns differently
-  const allKeys = Object.keys(issue);
-  for (const key of allKeys) {
-    if (key.toLowerCase().includes('sprint')) {
-      const value = issue[key];
-      if (value && value.trim() !== '' && value.trim() !== '[]') {
-        return value.trim();
+  // Then check for columns that contain "sprint" but exclude "Custom field" columns
+  // This handles variations like "Sprint Name" but avoids false matches
+  const sprintKeys = Object.keys(issue).filter((key) => {
+    const lowerKey = key.toLowerCase();
+    return (
+      lowerKey.includes('sprint') &&
+      !lowerKey.includes('custom field') && // Exclude Custom field columns
+      lowerKey !== 'sprint' // Already checked above, but be safe
+    );
+  });
+
+  // Try each Sprint column variation
+  for (const key of sprintKeys) {
+    const value = issue[key];
+    if (value && value.trim() !== '') {
+      const trimmed = value.trim();
+      // Skip empty values, empty arrays, and non-sprint-looking values
+      if (
+        trimmed.length > 0 &&
+        trimmed !== '[]' &&
+        !trimmed.startsWith('Checklist(') // Exclude Smart Checklist values
+      ) {
+        return trimmed;
       }
     }
   }
@@ -2622,6 +2640,10 @@ figma.ui.onmessage = async (msg: PluginMessage) => {
  * @returns true if any duplicates were found and processed, false otherwise
  */
 async function handleCardDuplication(): Promise<boolean> {
+  // Skip duplicate detection during import to avoid notifications
+  if (isImporting) {
+    return false;
+  }
   const templateNames = new Set([
     'Theme',
     'Initiative',
@@ -2848,21 +2870,8 @@ async function handleCardDuplication(): Promise<boolean> {
             }
           }
 
-          // Notify user that the card has been marked for export (only if not importing)
-          if (!isImporting) {
-            // Get card title from the first text node (which may have been replaced)
-            // Re-find text nodes to ensure we have the current ones
-            const currentTextNodes = duplicateFrame.findAll(
-              (node) => node.type === 'TEXT'
-            ) as TextNode[];
-            const cardTitle =
-              currentTextNodes.length > 0
-                ? currentTextNodes[0].characters.trim()
-                : 'Card';
-            figma.notify(
-              `📋 Copied card "${cardTitle}" marked for export (no issue key)`
-            );
-          }
+          // Duplicate detection and processing is logged to console
+          // No toast notification needed - duplicate detection runs silently
           duplicatesProcessed = true;
         }
       }
@@ -3009,6 +3018,10 @@ checkForDuplicates();
 
 // Listen for selection changes to detect when cards are duplicated
 figma.on('selectionchange', () => {
+  // Skip duplicate check during import
+  if (isImporting) {
+    return;
+  }
   // Small delay to ensure duplication is complete before checking
   setTimeout(() => {
     checkForDuplicates();
@@ -3019,7 +3032,10 @@ figma.on('selectionchange', () => {
 // This ensures we catch duplicates even if selection doesn't change
 // Reduced frequency to avoid unnecessary checks
 setInterval(() => {
-  checkForDuplicates();
+  // Skip duplicate check during import
+  if (!isImporting) {
+    checkForDuplicates();
+  }
 }, TIMING_CONFIG.DUPLICATE_CHECK_INTERVAL);
 
 // Check if running in FigJam (recommended for this plugin)
