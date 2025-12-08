@@ -7,13 +7,19 @@ import { TEMPLATES } from './templates';
  */
 export type PluginMessage =
   | { type: 'insert-template'; templateType: keyof typeof TEMPLATES }
-  | { type: 'import-csv'; csvText: string; jiraBaseUrl?: string; importVerbose?: boolean }
+  | { type: 'import-csv'; csvText: string; jiraBaseUrl?: string; importVerbose?: boolean; maxCardsPerColumn?: number; numFutureSprints?: number; futureSprintsColumns?: number }
   | { type: 'export-csv'; filterNew?: boolean }
+  | { type: 'get-settings' }
   | { type: 'get-jira-url' }
   | { type: 'set-jira-url'; jiraBaseUrl: string }
+  | { type: 'set-import-verbose'; importVerbose: boolean }
+  | { type: 'set-max-cards-per-column'; maxCardsPerColumn: number }
+  | { type: 'set-num-future-sprints'; numFutureSprints: number }
+  | { type: 'set-future-sprints-columns'; futureSprintsColumns: number }
   | { type: 'close' };
 
 export type UIMessage =
+  | { type: 'settings-loaded'; jiraBaseUrl?: string; importVerbose?: boolean; maxCardsPerColumn?: number; numFutureSprints?: number; futureSprintsColumns?: number }
   | { type: 'jira-url-loaded'; jiraBaseUrl?: string };
 
 /**

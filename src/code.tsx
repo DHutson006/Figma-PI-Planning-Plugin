@@ -810,7 +810,12 @@ function groupIssuesBySprint(issues: Array<{ [key: string]: string }>): {
  * Preprocesses issues for multi-team swimlane layout.
  * Returns organized data structure for creating swimlanes.
  */
-function preprocessMultiTeamData(issues: Array<{ [key: string]: string }>): {
+function preprocessMultiTeamData(
+  issues: Array<{ [key: string]: string }>,
+  maxCardsPerColumn: number = 5,
+  numFutureSprints: number = 6,
+  futureSprintsColumns: number = 6
+): {
   teams: string[];
   sprintKeys: string[]; // Sorted list of "{Year}-{Sprint Number}" keys
   issuesByTeamAndSprint: {
@@ -943,15 +948,18 @@ function preprocessMultiTeamData(issues: Array<{ [key: string]: string }>): {
     return sprintA - sprintB;
   });
 
-  // Add 6 future sprints for PI planning purposes
-  // Calculate the next 6 sprints after the last sprint in the data
+  // Add future sprints for PI planning purposes (number configurable via settings)
+  // numFutureSprints: Controls how many future sprints are added starting from the last sprint in the import
+  // futureSprintsColumns: Controls how many columns each future sprint should span
   const futureSprintKeys: string[] = [];
+  const numFutureSprintsToAdd = numFutureSprints || 6; // Default to 6 if not provided
   if (sprintKeys.length > 0) {
+    // Get the last sprint from the sorted sprint keys (most recent sprint in the import)
     const lastSprintKey = sprintKeys[sprintKeys.length - 1];
     const [lastYear, lastSprintNumber] = lastSprintKey.split('-').map(Number);
 
-    // Calculate the next 6 sprints
-    for (let i = 1; i <= 6; i++) {
+    // Calculate the next N sprints (where N = numFutureSprints)
+    for (let i = 1; i <= numFutureSprintsToAdd; i++) {
       let nextYear = lastYear;
       let nextSprintNumber = lastSprintNumber + i;
 
@@ -969,11 +977,12 @@ function preprocessMultiTeamData(issues: Array<{ [key: string]: string }>): {
 
   // Calculate sprint column widths (accounting for epics that span multiple columns)
   const sprintColumnWidths: { [sprintKey: string]: number } = {};
-  const MAX_CARDS_PER_COLUMN = 5; // Match the constant used in processTeamSprintTickets
+  const MAX_CARDS_PER_COLUMN = maxCardsPerColumn; // Use setting from user preferences
   for (const sprintKey of sprintKeys) {
-    // Future sprints are always 6 columns wide for PI planning
+    // Future sprints use the configured number of columns (futureSprintsColumns) for PI planning
+    // This controls how many columns each future sprint spans
     if (futureSprintKeys.includes(sprintKey)) {
-      sprintColumnWidths[sprintKey] = 6;
+      sprintColumnWidths[sprintKey] = futureSprintsColumns;
       continue;
     }
 
@@ -1190,12 +1199,13 @@ async function processIssueBatch(
   jiraBaseUrl?: string,
   sprint?: string,
   epicLink?: string,
-  importVerbose: boolean = true
+  importVerbose: boolean = true,
+  maxCardsPerColumn: number = 5
 ): Promise<{ created: number; skipped: number }> {
   let created = 0;
   let skipped = 0;
   const endIndex = Math.min(startIndex + batchSize, issues.length);
-  const MAX_CARDS_PER_COLUMN = 5;
+  const MAX_CARDS_PER_COLUMN = maxCardsPerColumn;
 
   for (let i = startIndex; i < endIndex; i++) {
     const issue = issues[i];
@@ -1329,11 +1339,12 @@ async function processTeamSprintTickets(
   createdFrames: FrameNode[],
   jiraBaseUrl?: string,
   updateLastCardBottom?: (bottom: number) => void,
-  importVerbose: boolean = true
+  importVerbose: boolean = true,
+  maxCardsPerColumn: number = 5
 ): Promise<{ maxY: number; columnsUsed: number }> {
   const spacing = LAYOUT_CONFIG.CARD_SPACING;
   const cardWidth = CARD_CONFIG.WIDTH;
-  const MAX_CARDS_PER_COLUMN = 5;
+  const MAX_CARDS_PER_COLUMN = maxCardsPerColumn;
 
   // Group issues by epic
   const issuesByEpic: { [epicKey: string]: Array<{ [key: string]: string }> } =
@@ -1776,7 +1787,10 @@ async function processTeamSprintTickets(
 async function importCardsFromCSV(
   csvText: string,
   jiraBaseUrl?: string,
-  importVerbose: boolean = true
+  importVerbose: boolean = false,
+  maxCardsPerColumn: number = 5,
+  numFutureSprints: number = 6,
+  futureSprintsColumns: number = 6
 ): Promise<void> {
   console.log(
     'importCardsFromCSV called with csvText length:',
@@ -1788,6 +1802,18 @@ async function importCardsFromCSV(
     importVerbose,
     'type:',
     typeof importVerbose
+  );
+  console.log(
+    'importCardsFromCSV called with maxCardsPerColumn:',
+    maxCardsPerColumn,
+    'type:',
+    typeof maxCardsPerColumn
+  );
+  console.log(
+    'importCardsFromCSV called with futureSprintsColumns:',
+    futureSprintsColumns,
+    'type:',
+    typeof futureSprintsColumns
   );
 
   try {
@@ -1836,7 +1862,12 @@ async function importCardsFromCSV(
     }
 
     // Preprocess data for multi-team swimlane layout
-    const preprocessed = preprocessMultiTeamData(issues);
+    const preprocessed = preprocessMultiTeamData(
+      issues,
+      maxCardsPerColumn,
+      numFutureSprints,
+      futureSprintsColumns
+    );
     const {
       teams,
       sprintKeys,
@@ -1924,7 +1955,7 @@ async function importCardsFromCSV(
     const sprintHeaderHeight = 100; // Space for sprint labels and dates
 
     // Calculate backlog column width based on actual columns needed (accounting for epics spanning multiple columns)
-    const MAX_CARDS_PER_COLUMN = 5; // Match the constant used in processTeamSprintTickets
+    const MAX_CARDS_PER_COLUMN = maxCardsPerColumn; // Use setting from user preferences
     let maxBacklogColumns = 0;
     for (const team of teams) {
       const backlogIssues = issuesByTeamAndBacklog[team] || [];
@@ -2016,10 +2047,16 @@ async function importCardsFromCSV(
     // Track the actual bottom of the last card across all teams (for vertical box height)
     // This will be updated as each card is created
     let lastCardBottom = 0;
+    // Track the maxY returned from processTeamSprintTickets for each team/sprint
+    // This gives us the actual bottom position more accurately
+    let maxMaxY = 0;
     // Track actual columns used per sprint to update widths dynamically
     const actualSprintColumns: { [sprintKey: string]: number } = {};
     // Track where cards actually start (for vertical box start position)
     let firstTeamCardsStartY: number | null = null;
+    // Track the bottom of the last team (where the next team would start)
+    // This is the most accurate way to determine where the vertical lines should end
+    let lastTeamBottom = 0;
 
     for (let teamIndex = 0; teamIndex < teams.length; teamIndex++) {
       const team = teams[teamIndex];
@@ -2074,6 +2111,12 @@ async function importCardsFromCSV(
       // This ensures the backlog line aligns with sprint lines
       const dummyDatesText = figma.createText();
       dummyDatesText.characters = 'MM/DD/YYYY - MM/DD/YYYY';
+      try {
+        await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+        dummyDatesText.fontName = { family: 'Inter', style: 'Regular' };
+      } catch (e) {
+        console.warn('Could not set font for dummy dates, using default');
+      }
       dummyDatesText.fontSize = LAYOUT_CONFIG.SPRINT_DATES_FONT_SIZE;
       // Don't append to page, just use for height calculation
       const datesTextHeight = dummyDatesText.height;
@@ -2132,8 +2175,14 @@ async function importCardsFromCSV(
             lastCardBottom = Math.max(lastCardBottom, bottom);
             teamLastCardBottom = Math.max(teamLastCardBottom, bottom);
           },
-          importVerbose
+          importVerbose,
+          maxCardsPerColumn
         );
+        // Track the maxY from the result (this is the actual bottom of cards in this sprint)
+        // backlogResult.maxY is already an absolute position (starts at startY which is backlogCardsStartY)
+        if (backlogResult && backlogResult.maxY > 0) {
+          maxMaxY = Math.max(maxMaxY, backlogResult.maxY);
+        }
       } else {
         // Even if no backlog issues, ensure teamLastCardBottom is at least at the cards start position
         teamLastCardBottom = Math.max(teamLastCardBottom, backlogCardsStartY);
@@ -2244,6 +2293,12 @@ async function importCardsFromCSV(
         // Create sprint dates text - smaller font, positioned under the sprint label
         const sprintDatesText = figma.createText();
         sprintDatesText.characters = sprintDates;
+        try {
+          await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+          sprintDatesText.fontName = { family: 'Inter', style: 'Regular' };
+        } catch (e) {
+          console.warn('Could not set font for sprint dates, using default');
+        }
         sprintDatesText.fontSize = LAYOUT_CONFIG.SPRINT_DATES_FONT_SIZE;
         sprintDatesText.fills = [
           { type: 'SOLID', color: COLOR_CONFIG.TEXT_SECONDARY },
@@ -2300,8 +2355,14 @@ async function importCardsFromCSV(
               lastCardBottom = Math.max(lastCardBottom, bottom);
               teamLastCardBottom = Math.max(teamLastCardBottom, bottom);
             },
-            importVerbose
+            importVerbose,
+            maxCardsPerColumn
           );
+          // Track the maxY from the result (this is the actual bottom of cards in this sprint)
+          // result.maxY is already an absolute position (starts at startY which is cardsStartY)
+          if (result && result.maxY > 0) {
+            maxMaxY = Math.max(maxMaxY, result.maxY);
+          }
           // Track actual columns used (take max across teams)
           actualSprintColumns[sprintKey] = Math.max(
             actualSprintColumns[sprintKey] || 0,
@@ -2327,39 +2388,90 @@ async function importCardsFromCSV(
             : 0;
         teamYOffset = teamLastCardBottom + teamSpacing + capacityTableSpacing;
       }
+
+      // Track the last team's bottom (this is where the next team would start)
+      // This is the most accurate bottom position for vertical lines
+      lastTeamBottom = teamLastCardBottom;
     }
 
     // Create vertical boxes (skinny rectangles) after all teams are processed
     // Use the actual bottom of the last card that was created
     const verticalBoxStartY = firstTeamCardsStartY || fixedSprintLabelY;
-    // Stop at the actual bottom of the last card (lastCardBottom tracks this exactly)
-    const verticalBoxHeight = lastCardBottom - verticalBoxStartY;
-    const verticalBoxWidth = COLOR_CONFIG.BORDER_WEIGHT; // Use border weight as width for skinny boxes
 
-    // Create backlog vertical box
-    const backlogVerticalBox = figma.createRectangle();
-    backlogVerticalBox.x = backlogVerticalBoxX;
-    backlogVerticalBox.y = verticalBoxStartY;
-    backlogVerticalBox.resize(verticalBoxWidth, verticalBoxHeight);
-    backlogVerticalBox.fills = [
-      { type: 'SOLID', color: COLOR_CONFIG.TEXT_SECONDARY },
-    ];
-    backlogVerticalBox.strokes = [];
-    figma.currentPage.appendChild(backlogVerticalBox);
-    createdFrames.push(backlogVerticalBox as any);
+    // Use the last team's bottom as the end of the vertical lines
+    // This is where the next team would start, which is the most accurate bottom position
+    // This matches the logic used to position teams: teamYOffset = teamLastCardBottom + teamSpacing + capacityTableSpacing
+    let actualLastCardBottom = lastTeamBottom;
 
-    // Create sprint vertical boxes
-    for (const boxX of sprintVerticalBoxPositions) {
-      const sprintVerticalBox = figma.createRectangle();
-      sprintVerticalBox.x = boxX;
-      sprintVerticalBox.y = verticalBoxStartY;
-      sprintVerticalBox.resize(verticalBoxWidth, verticalBoxHeight);
-      sprintVerticalBox.fills = [
+    // Fallback 1: Use maxMaxY if lastTeamBottom wasn't set properly
+    if (actualLastCardBottom === 0 && maxMaxY > 0) {
+      actualLastCardBottom = maxMaxY;
+    }
+
+    // Fallback 2: Use lastCardBottom callback if still no value
+    if (actualLastCardBottom === 0 && lastCardBottom > 0) {
+      actualLastCardBottom = lastCardBottom;
+    }
+
+    // Fallback 3: If still no value, scan all frames on the page to find the actual bottom
+    if (
+      actualLastCardBottom === 0 ||
+      actualLastCardBottom < verticalBoxStartY
+    ) {
+      const allFrames = figma.currentPage.findAll(
+        (node) => node.type === 'FRAME'
+      ) as FrameNode[];
+      for (const frame of allFrames) {
+        const templateType = frame.getPluginData('templateType');
+        const isEpicLabel = frame.getPluginData('isEpicLabel') === 'true';
+        // Check both card frames and epic label frames
+        if (templateType || isEpicLabel) {
+          // This is a card or epic label frame - check its bottom edge
+          const frameBottom = frame.y + frame.height;
+          actualLastCardBottom = Math.max(actualLastCardBottom, frameBottom);
+        }
+      }
+    }
+
+    // Only create vertical boxes if we have cards and a valid bottom position
+    if (actualLastCardBottom > verticalBoxStartY) {
+      const verticalBoxHeight = actualLastCardBottom - verticalBoxStartY;
+      const verticalBoxWidth = COLOR_CONFIG.BORDER_WEIGHT; // Use border weight as width for skinny boxes
+
+      console.log('Vertical box calculation:', {
+        verticalBoxStartY,
+        actualLastCardBottom,
+        verticalBoxHeight,
+        lastTeamBottom,
+        maxMaxY,
+        lastCardBottom,
+      });
+
+      // Create backlog vertical box (thin rectangle)
+      const backlogVerticalBox = figma.createRectangle();
+      backlogVerticalBox.x = backlogVerticalBoxX;
+      backlogVerticalBox.y = verticalBoxStartY;
+      backlogVerticalBox.resize(verticalBoxWidth, verticalBoxHeight);
+      backlogVerticalBox.fills = [
         { type: 'SOLID', color: COLOR_CONFIG.TEXT_SECONDARY },
       ];
-      sprintVerticalBox.strokes = [];
-      figma.currentPage.appendChild(sprintVerticalBox);
-      createdFrames.push(sprintVerticalBox as any);
+      backlogVerticalBox.strokes = [];
+      figma.currentPage.appendChild(backlogVerticalBox);
+      createdFrames.push(backlogVerticalBox as any);
+
+      // Create sprint vertical boxes (thin rectangles)
+      for (const boxX of sprintVerticalBoxPositions) {
+        const sprintVerticalBox = figma.createRectangle();
+        sprintVerticalBox.x = boxX;
+        sprintVerticalBox.y = verticalBoxStartY;
+        sprintVerticalBox.resize(verticalBoxWidth, verticalBoxHeight);
+        sprintVerticalBox.fills = [
+          { type: 'SOLID', color: COLOR_CONFIG.TEXT_SECONDARY },
+        ];
+        sprintVerticalBox.strokes = [];
+        figma.currentPage.appendChild(sprintVerticalBox);
+        createdFrames.push(sprintVerticalBox as any);
+      }
     }
 
     // Count total created cards
@@ -3561,14 +3673,27 @@ figma.ui.onmessage = async (msg: PluginMessage) => {
       console.log('Starting CSV import, data length:', msg.csvText.length);
       console.log('Jira Base URL received:', msg.jiraBaseUrl);
       const importVerbose =
-        msg.importVerbose !== undefined ? msg.importVerbose : true;
+        msg.importVerbose !== undefined ? msg.importVerbose : false;
+      const maxCardsPerColumn = msg.maxCardsPerColumn || 5;
+      const numFutureSprints = msg.numFutureSprints || 6;
+      const futureSprintsColumns = msg.futureSprintsColumns || 6;
       console.log(
         'Import CSV - importVerbose value:',
         importVerbose,
         'type:',
         typeof importVerbose
       );
-      await importCardsFromCSV(msg.csvText, msg.jiraBaseUrl, importVerbose);
+      console.log('Import CSV - maxCardsPerColumn:', maxCardsPerColumn);
+      console.log('Import CSV - numFutureSprints:', numFutureSprints);
+      console.log('Import CSV - futureSprintsColumns:', futureSprintsColumns);
+      await importCardsFromCSV(
+        msg.csvText,
+        msg.jiraBaseUrl,
+        importVerbose,
+        maxCardsPerColumn,
+        numFutureSprints,
+        futureSprintsColumns
+      );
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       figma.notify(`❌ Error importing CSV: ${errorMessage}`);
@@ -3582,6 +3707,40 @@ figma.ui.onmessage = async (msg: PluginMessage) => {
       const errorMessage = getErrorMessage(error);
       figma.notify(`❌ Error exporting CSV: ${errorMessage}`);
       console.error('CSV export error:', error);
+    }
+  } else if (msg.type === 'get-settings') {
+    try {
+      const [
+        jiraBaseUrl,
+        importVerbose,
+        maxCardsPerColumn,
+        numFutureSprints,
+        futureSprintsColumns,
+      ] = await Promise.all([
+        figma.clientStorage.getAsync('jiraBaseUrl'),
+        figma.clientStorage.getAsync('importVerbose'),
+        figma.clientStorage.getAsync('maxCardsPerColumn'),
+        figma.clientStorage.getAsync('numFutureSprints'),
+        figma.clientStorage.getAsync('futureSprintsColumns'),
+      ]);
+      figma.ui.postMessage({
+        type: 'settings-loaded',
+        jiraBaseUrl: jiraBaseUrl || undefined,
+        importVerbose: importVerbose !== undefined ? importVerbose : false,
+        maxCardsPerColumn: maxCardsPerColumn || 5,
+        numFutureSprints: numFutureSprints || 6,
+        futureSprintsColumns: futureSprintsColumns || 6,
+      } as UIMessage);
+    } catch (error) {
+      console.error('Error loading settings:', error);
+      figma.ui.postMessage({
+        type: 'settings-loaded',
+        jiraBaseUrl: undefined,
+        importVerbose: false,
+        maxCardsPerColumn: 5,
+        numFutureSprints: 6,
+        futureSprintsColumns: 6,
+      } as UIMessage);
     }
   } else if (msg.type === 'get-jira-url') {
     try {
@@ -3602,6 +3761,39 @@ figma.ui.onmessage = async (msg: PluginMessage) => {
       await figma.clientStorage.setAsync('jiraBaseUrl', msg.jiraBaseUrl);
     } catch (error) {
       console.error('Error saving Jira URL:', error);
+    }
+  } else if (msg.type === 'set-import-verbose') {
+    try {
+      await figma.clientStorage.setAsync('importVerbose', msg.importVerbose);
+    } catch (error) {
+      console.error('Error saving Import Verbose setting:', error);
+    }
+  } else if (msg.type === 'set-max-cards-per-column') {
+    try {
+      await figma.clientStorage.setAsync(
+        'maxCardsPerColumn',
+        msg.maxCardsPerColumn
+      );
+    } catch (error) {
+      console.error('Error saving Max Cards Per Column setting:', error);
+    }
+  } else if (msg.type === 'set-num-future-sprints') {
+    try {
+      await figma.clientStorage.setAsync(
+        'numFutureSprints',
+        msg.numFutureSprints
+      );
+    } catch (error) {
+      console.error('Error saving Number of Future Sprints setting:', error);
+    }
+  } else if (msg.type === 'set-future-sprints-columns') {
+    try {
+      await figma.clientStorage.setAsync(
+        'futureSprintsColumns',
+        msg.futureSprintsColumns
+      );
+    } catch (error) {
+      console.error('Error saving Future Sprints Columns setting:', error);
     }
   } else if (msg.type === 'close') {
     figma.closePlugin();

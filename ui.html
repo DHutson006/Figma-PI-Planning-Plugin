@@ -204,6 +204,83 @@
             cursor: pointer;
             user-select: none;
         }
+
+        .settings-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--figma-color-border);
+        }
+
+        .settings-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            padding: 8px 0;
+            user-select: none;
+        }
+
+        .settings-header:hover {
+            color: var(--figma-color-text-hover);
+        }
+
+        .settings-header h2 {
+            font-size: 14px;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .settings-content {
+            display: none;
+            margin-top: 12px;
+        }
+
+        .settings-content.expanded {
+            display: block;
+        }
+
+        .settings-toggle {
+            font-size: 12px;
+            color: var(--figma-color-text-secondary);
+        }
+
+        .settings-input-group {
+            margin-bottom: 16px;
+        }
+
+        .settings-input-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 6px;
+            color: var(--figma-color-text);
+        }
+
+        .settings-input-group input[type="number"] {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid var(--figma-color-border);
+            border-radius: 6px;
+            font-size: 13px;
+            background: var(--figma-color-bg);
+            color: var(--figma-color-text);
+        }
+
+        .settings-input-group input[type="number"]:focus {
+            outline: none;
+            border-color: var(--figma-color-border-selected);
+        }
+
+        .settings-input-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .settings-input-row .settings-input-group {
+            flex: 1;
+            margin-bottom: 0;
+        }
     </style>
 </head>
 
@@ -297,15 +374,6 @@
     </div>
 
     <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--figma-color-border);">
-        <label for="jira-url" class="jira-url-label">
-            Jira Base URL
-        </label>
-        <input type="text" id="jira-url" class="jira-url-input" placeholder="https://yourcompany.atlassian.net"
-            value="">
-        <div class="checkbox-container">
-            <input type="checkbox" id="import-verbose">
-            <label for="import-verbose">Import Verbose</label>
-        </div>
         <label for="csv-upload" class="export-button"
             style="display: block; text-align: center; cursor: pointer; margin-bottom: 12px; width: 100%;">
             Import from Jira CSV
@@ -318,6 +386,40 @@
             <button id="export-all-btn" class="export-button">
                 Export All
             </button>
+        </div>
+    </div>
+
+    <div class="settings-section">
+        <div class="settings-header" id="settings-toggle">
+            <h2>Settings</h2>
+            <span class="settings-toggle" id="settings-toggle-icon">▼</span>
+        </div>
+        <div class="settings-content" id="settings-content">
+            <div class="settings-input-group">
+                <label for="jira-url" class="jira-url-label">
+                    Jira Base URL
+                </label>
+                <input type="text" id="jira-url" class="jira-url-input" placeholder="https://yourcompany.atlassian.net"
+                    value="">
+            </div>
+            <div class="checkbox-container">
+                <input type="checkbox" id="import-verbose">
+                <label for="import-verbose">Import Verbose</label>
+            </div>
+            <div class="settings-input-group">
+                <label for="max-cards-per-column">Max Cards Per Column</label>
+                <input type="number" id="max-cards-per-column" min="1" max="20" value="5">
+            </div>
+            <div class="settings-input-row">
+                <div class="settings-input-group">
+                    <label for="num-future-sprints">Future Sprints</label>
+                    <input type="number" id="num-future-sprints" min="1" max="20" value="6">
+                </div>
+                <div class="settings-input-group">
+                    <label for="future-sprints-columns">Columns</label>
+                    <input type="number" id="future-sprints-columns" min="1" max="20" value="6">
+                </div>
+            </div>
         </div>
     </div>
 
@@ -335,13 +437,34 @@
             });
         });
 
-        // Load saved Jira URL from plugin storage
-        const jiraUrlInput = document.getElementById('jira-url');
+        // Settings toggle functionality
+        const settingsToggle = document.getElementById('settings-toggle');
+        const settingsContent = document.getElementById('settings-content');
+        const settingsToggleIcon = document.getElementById('settings-toggle-icon');
+        let settingsExpanded = false;
 
-        // Request saved Jira URL from plugin
+        settingsToggle.addEventListener('click', () => {
+            settingsExpanded = !settingsExpanded;
+            if (settingsExpanded) {
+                settingsContent.classList.add('expanded');
+                settingsToggleIcon.textContent = '▲';
+            } else {
+                settingsContent.classList.remove('expanded');
+                settingsToggleIcon.textContent = '▼';
+            }
+        });
+
+        // Load saved settings from plugin storage
+        const jiraUrlInput = document.getElementById('jira-url');
+        const importVerboseCheckbox = document.getElementById('import-verbose');
+        const maxCardsPerColumnInput = document.getElementById('max-cards-per-column');
+        const numFutureSprintsInput = document.getElementById('num-future-sprints');
+        const futureSprintsColumnsInput = document.getElementById('future-sprints-columns');
+
+        // Request saved settings from plugin
         parent.postMessage({
             pluginMessage: {
-                type: 'get-jira-url'
+                type: 'get-settings'
             }
         }, '*');
 
@@ -354,6 +477,55 @@
                     jiraBaseUrl: url
                 }
             }, '*');
+        });
+
+        // Save Import Verbose when it changes
+        importVerboseCheckbox.addEventListener('change', (event) => {
+            parent.postMessage({
+                pluginMessage: {
+                    type: 'set-import-verbose',
+                    importVerbose: event.target.checked
+                }
+            }, '*');
+        });
+
+        // Save Max Cards Per Column when it changes
+        maxCardsPerColumnInput.addEventListener('change', (event) => {
+            const value = parseInt(event.target.value, 10);
+            if (!isNaN(value) && value > 0) {
+                parent.postMessage({
+                    pluginMessage: {
+                        type: 'set-max-cards-per-column',
+                        maxCardsPerColumn: value
+                    }
+                }, '*');
+            }
+        });
+
+        // Save Number of Future Sprints when it changes
+        numFutureSprintsInput.addEventListener('change', (event) => {
+            const value = parseInt(event.target.value, 10);
+            if (!isNaN(value) && value > 0) {
+                parent.postMessage({
+                    pluginMessage: {
+                        type: 'set-num-future-sprints',
+                        numFutureSprints: value
+                    }
+                }, '*');
+            }
+        });
+
+        // Save Future Sprints Columns when it changes
+        futureSprintsColumnsInput.addEventListener('change', (event) => {
+            const value = parseInt(event.target.value, 10);
+            if (!isNaN(value) && value > 0) {
+                parent.postMessage({
+                    pluginMessage: {
+                        type: 'set-future-sprints-columns',
+                        futureSprintsColumns: value
+                    }
+                }, '*');
+            }
         });
 
         // Handle CSV file upload
@@ -369,16 +541,25 @@
             reader.onload = (e) => {
                 const csvText = e.target.result;
                 const jiraBaseUrl = jiraUrlInput.value.trim() || undefined;
-                const importVerbose = document.getElementById('import-verbose').checked;
+                const importVerbose = importVerboseCheckbox.checked;
+                const maxCardsPerColumn = parseInt(maxCardsPerColumnInput.value, 10) || 5;
+                const numFutureSprints = parseInt(numFutureSprintsInput.value, 10) || 6;
+                const futureSprintsColumns = parseInt(futureSprintsColumnsInput.value, 10) || 6;
                 console.log('File read successfully, length:', csvText.length);
                 console.log('Jira Base URL being sent:', jiraBaseUrl);
                 console.log('Import Verbose:', importVerbose);
+                console.log('Max Cards Per Column:', maxCardsPerColumn);
+                console.log('Number of Future Sprints:', numFutureSprints);
+                console.log('Future Sprints Columns:', futureSprintsColumns);
                 parent.postMessage({
                     pluginMessage: {
                         type: 'import-csv',
                         csvText: csvText,
                         jiraBaseUrl: jiraBaseUrl,
-                        importVerbose: importVerbose
+                        importVerbose: importVerbose,
+                        maxCardsPerColumn: maxCardsPerColumn,
+                        numFutureSprints: numFutureSprints,
+                        futureSprintsColumns: futureSprintsColumns
                     }
                 }, '*');
             };
@@ -425,10 +606,22 @@
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-            } else if (msg.type === 'jira-url-loaded') {
-                // Populate the Jira URL input with saved value
-                if (msg.jiraBaseUrl) {
-                    jiraUrlInput.value = msg.jiraBaseUrl;
+            } else if (msg.type === 'settings-loaded') {
+                // Populate all settings inputs with saved values
+                if (msg.jiraBaseUrl !== undefined) {
+                    jiraUrlInput.value = msg.jiraBaseUrl || '';
+                }
+                if (msg.importVerbose !== undefined) {
+                    importVerboseCheckbox.checked = msg.importVerbose;
+                }
+                if (msg.maxCardsPerColumn !== undefined) {
+                    maxCardsPerColumnInput.value = msg.maxCardsPerColumn.toString();
+                }
+                if (msg.numFutureSprints !== undefined) {
+                    numFutureSprintsInput.value = msg.numFutureSprints.toString();
+                }
+                if (msg.futureSprintsColumns !== undefined) {
+                    futureSprintsColumnsInput.value = msg.futureSprintsColumns.toString();
                 }
             }
         };
