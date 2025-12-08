@@ -5,7 +5,8 @@
     "main": "code.js",
     "scripts": {
         "build": "esbuild src/code.tsx --bundle --format=iife --outfile=code.js --platform=browser --target=es2020 --legal-comments=none && sed -i '' '1d' code.js",
-        "watch": "esbuild src/code.tsx --bundle --format=iife --outfile=code.js --platform=browser --target=es2020 --watch"
+        "watch": "esbuild src/code.tsx --bundle --format=iife --outfile=code.js --platform=browser --target=es2020 --watch",
+        "postinstall": "npm run build"
     },
     "keywords": [
         "figma",
