@@ -3292,6 +3292,12 @@ function exportCardsToCSV(filterNew: boolean = false): void {
     }
   });
 
+  // Check if any epic tickets are included - if so, add Epic Name column
+  const hasEpicTickets = cards.some((card) => card.type === 'Epic');
+  if (hasEpicTickets) {
+    allCSVColumns.add('Epic Name');
+  }
+
   // Build ordered CSV columns: Summary, Issue key, Issue Type, then others
   const orderedCSVColumns: string[] = [];
   const remainingColumns: string[] = [];
@@ -3334,12 +3340,36 @@ function exportCardsToCSV(filterNew: boolean = false): void {
 
   // Add any remaining columns alphabetically
   allCSVColumns.forEach((col) => {
-    if (!orderedCSVColumns.includes(col) && col !== 'Issue Type') {
+    if (
+      !orderedCSVColumns.includes(col) &&
+      col !== 'Issue Type' &&
+      col !== 'Epic Name'
+    ) {
       remainingColumns.push(col);
     }
   });
   remainingColumns.sort();
+
+  // Add Epic Name column if needed (after Epic Link if present, otherwise in priority order)
+  if (hasEpicTickets && !orderedCSVColumns.includes('Epic Name')) {
+    const epicLinkIndex = orderedCSVColumns.indexOf('Custom field (Epic Link)');
+    if (epicLinkIndex >= 0) {
+      orderedCSVColumns.splice(epicLinkIndex + 1, 0, 'Epic Name');
+    } else {
+      // Add after Issue Type if Epic Link not present
+      const issueTypeIndex = orderedCSVColumns.indexOf('Issue Type');
+      if (issueTypeIndex >= 0) {
+        orderedCSVColumns.splice(issueTypeIndex + 1, 0, 'Epic Name');
+      } else {
+        orderedCSVColumns.push('Epic Name');
+      }
+    }
+  }
+
   const finalCSVColumns = orderedCSVColumns.concat(remainingColumns);
+
+  // Always add label column at the end
+  finalCSVColumns.push('label');
 
   // Generate CSV header
   const header = finalCSVColumns.join(',');
@@ -3353,7 +3383,8 @@ function exportCardsToCSV(filterNew: boolean = false): void {
       let value = '';
 
       if (csvColumn === 'Summary') {
-        value = card.title;
+        // Clean newline characters from title (Jira doesn't accept newlines in Summary)
+        value = card.title.replace(/\n/g, ' ').replace(/\r/g, '');
       } else if (csvColumn === 'Issue key') {
         value = card.issueKey || '';
       } else if (csvColumn === 'Issue Type') {
@@ -3364,6 +3395,14 @@ function exportCardsToCSV(filterNew: boolean = false): void {
         value = card.epicLink || '';
       } else if (csvColumn === 'Custom field (Studio)') {
         value = card.team || '';
+      } else if (csvColumn === 'Epic Name') {
+        // Epic Name should be the same as Summary for epic tickets
+        if (card.type === 'Epic') {
+          value = card.title.replace(/\n/g, ' ').replace(/\r/g, '');
+        }
+      } else if (csvColumn === 'label') {
+        // Always set label to "NeedsReview"
+        value = 'NeedsReview';
       } else {
         // Find the internal field label(s) for this CSV column
         const internalLabels = csvColumnMap.get(csvColumn);
