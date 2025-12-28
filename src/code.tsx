@@ -923,6 +923,7 @@ function preprocessMultiTeamData(
 } {
   const sprintMap = new Map<string, ReturnType<typeof parseSprintName>>();
   const teamSet = new Set<string>();
+  const teamNameAliases: { [alias: string]: string } = {};
   const issuesByTeamAndSprint: {
     [team: string]: {
       [sprintKey: string]: Array<{ [key: string]: string | string[] }>;
@@ -955,6 +956,8 @@ function preprocessMultiTeamData(
     // Custom field (Studio) typically contains the written team name (e.g., "Triton", "Gadget Hackwrench")
     // Custom field (Team) may contain an ID (e.g., "1039", "1040") or a name - validate it's not numeric
     let team = '';
+    const parsedTeamName =
+      parsed && !isNumericTeamID(parsed.team) ? parsed.team : '';
     const studioField = getIssueField(issue, 'Custom field (Studio)');
     if (studioField && studioField.trim() !== '') {
       team = studioField.trim();
@@ -966,11 +969,22 @@ function preprocessMultiTeamData(
         }
       }
     }
-    if (!team && parsed && !isNumericTeamID(parsed.team)) {
-      team = parsed.team;
+    if (!team && parsedTeamName) {
+      const aliasTarget = teamNameAliases[parsedTeamName];
+      team = aliasTarget || parsedTeamName;
     }
     if (!team) {
       team = 'Unknown';
+    }
+
+    if (
+      parsedTeamName &&
+      team &&
+      team !== 'Unknown' &&
+      team !== parsedTeamName &&
+      !teamNameAliases[parsedTeamName]
+    ) {
+      teamNameAliases[parsedTeamName] = team.trim();
     }
 
     if (team && team.trim() !== '') {
