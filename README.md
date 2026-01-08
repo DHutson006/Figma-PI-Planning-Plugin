@@ -59,10 +59,52 @@ A FigJam plugin that helps teams with PI (Program Increment) planning by providi
 4. **Use in FigJam**
    - Open a FigJam file
    - Go to `Menu > Plugins > Development > PI Planning Templates`
-   - The tool pane will open on the right side
+   - The tool pane will open on the left side
    - Click on any template card to insert it into your board
+----
+
+## How to Use the Tool
+
+### Buttons and Their Functions
+
+- **Import from Jira CSV**: Allows you to upload a CSV file exported from Jira. The plugin will map the issues to the appropriate templates and insert them into your FigJam board.
+- **Export New**: Exports all newly created cards (those without Jira issue keys) to a CSV file.
+- **Export All**: Exports all cards, including those with Jira issue keys, to a CSV file.
+
+### Settings and Their Usage
+
+- **Jira Base URL**: Enter the base URL of your Jira instance (e.g., `https://yourcompany.atlassian.net`). This is used to create hyperlinks for Jira issues.
+- **Import Verbose**: When enabled, imported tickets will show with more details displaying description and Acceptance Criteria for each ticket.
+- **Show Rolling Tickets**: This will use the first time an issue was added to a sprint as the card position assignment on import. This is useful for idenitifying aging tickets quickly.
+When this is off, the import will assign the most recent sprint an issue has. Default is off.
+- **Max Cards Per Column**: Sets the maximum number of cards allowed in a single column. Default is 5.
+- **Future Sprints**: Specifies the number of future sprints to display. This extends the template for as far out as you need for planning. Default is 6.
+- **Columns**: Defines the number of columns for future sprints. Default is 6.
+
+### Using the Plugin
+
+1. Open a FigJam file and launch the plugin from the `Menu > Plugins > Development > PI Planning Templates`.
+2. Adjust settings to customize the behavior of the plugin, at minimum include the Jira base url for your jira instance.
+3. In Jira, in the main menu bar up top go to Issues -> Search for issues, use JQL to filter a list of tickets for your team or agile release train. Then in the upper righthand corner choose export -> CSV (All Fields).
+4. Open the Figjam file and import the Jira issues using the `Import from Jira CSV` button. 
+5. Use the template cards to insert new planned tickets into your board. 5. As the facilitator, you can add the template tickets to the board. Any users invited to the board can contribute to planning by copying a template ticket or an imported ticket the plugin is not required.
+6. After planning Export cards back to a Jira compatible csv using the `Export New` (Recomended) to only export tickets from the session or `Export All` to get a list of imported tickets and newly added. 
+7. Review the export for accuracy and remove any template tickets which were not converted.
+8. In Jira in the main menu bar up top go to Issues -> Import Issues from CSV, follow the steps to map the field values and import. All tickets will contain the label "NeedsReview" so that they are easy to find for backlog refinement ceremonies.
+9. Start back at step 3. 
+
+Recomendations: 
+- Save your team specfic JQL query as a Jira Filter
+- when starting a new session always rexport from Jira to ensure an updated snap shot.
+- In most cases you should only export new tickets this will ensure you are not using Figma to modify and Jira remains the source of truth 
+- Always review your figma export for accuracy and modify it before import to ensure you do not add junk tickets into Jira
+
+----
 
 ## Development
+### Documentation
+
+- **[Business Rules & Logic Report](./BUSINESS_RULES.md)** - Comprehensive guide to business rules, data models, workflows, and implementation rationale. Essential reading for developers new to the codebase to understand the "why" behind the code.
 
 ### Build Scripts
 
@@ -92,10 +134,6 @@ A FigJam plugin that helps teams with PI (Program Increment) planning by providi
     ├── resilience.ts      # Retry logic and resilience patterns
     └── figma.d.ts         # Figma API type definitions
 ```
-
-### Documentation
-
-- **[Business Rules & Logic Report](./BUSINESS_RULES.md)** - Comprehensive guide to business rules, data models, workflows, and implementation rationale. Essential reading for developers new to the codebase to understand the "why" behind the code.
 
 ### Architecture
 
@@ -341,3 +379,4 @@ See [QUICK_START_DEPLOYMENT.md](./Deploy%20Docs/QUICK_START_DEPLOYMENT.md) for d
 ## License
 
 MIT
+
