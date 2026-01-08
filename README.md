@@ -87,7 +87,7 @@ When this is off, the import will assign the most recent sprint an issue has. De
 2. Adjust settings to customize the behavior of the plugin, at minimum include the Jira base url for your jira instance.
 3. In Jira, in the main menu bar up top go to Issues -> Search for issues, use JQL to filter a list of tickets for your team or agile release train. Then in the upper righthand corner choose export -> CSV (All Fields).
 4. Open the Figjam file and import the Jira issues using the `Import from Jira CSV` button. 
-5. Use the template cards to insert new planned tickets into your board. 5. As the facilitator, you can add the template tickets to the board. Any users invited to the board can contribute to planning by copying a template ticket or an imported ticket the plugin is not required.
+5. Use the template cards to insert new planned tickets into your board. As the facilitator, you can add the template tickets to the board and any users invited to the board can contribute to planning by copying a template ticket or an imported ticket. <u>**The plugin is not required.**<u>
 6. After planning Export cards back to a Jira compatible csv using the `Export New` (Recomended) to only export tickets from the session or `Export All` to get a list of imported tickets and newly added. 
 7. Review the export for accuracy and remove any template tickets which were not converted.
 8. In Jira in the main menu bar up top go to Issues -> Import Issues from CSV, follow the steps to map the field values and import. All tickets will contain the label "NeedsReview" so that they are easy to find for backlog refinement ceremonies.
